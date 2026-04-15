@@ -12,7 +12,7 @@ const REQUESTS = [
 ];
 
 export default function Network() {
-  const [suggestions, setSuggestions] = useState(SUGGESTIONS);
+  const [suggestions] = useState(SUGGESTIONS);
   const [requests, setRequests] = useState(REQUESTS);
   const [connected, setConnected] = useState({});
 
