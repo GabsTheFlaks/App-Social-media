@@ -131,9 +131,13 @@ export default function Feed({ session }) {
         imageUrl = await handleImageUpload(selectedImage);
       }
 
+      // Se não houver texto, passamos uma string vazia para não quebrar a restrição "not null"
+      // ou atualizamos o banco para permitir. Vamos passar string vazia por segurança.
+      const contentToSave = newPost.trim() ? newPost : ' ';
+
       const { error } = await supabase
         .from('posts')
-        .insert([{ user_id: session.user.id, content: newPost, image_url: imageUrl }]);
+        .insert([{ user_id: session.user.id, content: contentToSave, image_url: imageUrl }]);
 
       if (error) throw error;
       setNewPost('');
