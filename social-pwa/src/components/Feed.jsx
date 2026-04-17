@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Image as ImageIcon, Send, Users, X, Loader2 } from 'lucide-react';
+import { Image as ImageIcon, Send, Users, X, Loader2, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import Post from './Post';
