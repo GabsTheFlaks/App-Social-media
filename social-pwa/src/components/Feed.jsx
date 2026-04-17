@@ -95,10 +95,11 @@ export default function Feed({ session }) {
     fetchPosts();
 
     // Inscreve-se para atualizações no banco (tempo real)
-    const channel = supabase.channel('schema-db-changes')
+    const channel = supabase.channel('feed-posts-likes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, fetchPosts)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'likes' }, fetchPosts)
-      .subscribe();
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'likes' }, fetchPosts);
+
+    channel.subscribe();
 
     return () => {
       supabase.removeChannel(channel);

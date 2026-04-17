@@ -27,10 +27,11 @@ export default function Layout({ session }) {
 
     fetchUnread();
 
-    const channel = supabase.channel('schema-db-changes')
+    const channel = supabase.channel('layout-notifications')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${session?.user?.id}` }, fetchUnread)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'notifications', filter: `user_id=eq.${session?.user?.id}` }, fetchUnread)
-      .subscribe();
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'notifications', filter: `user_id=eq.${session?.user?.id}` }, fetchUnread);
+
+    channel.subscribe();
 
     return () => {
       isMounted = false;
