@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Mail, Briefcase, MapPin, Edit3, Camera, ImageIcon } from 'lucide-react';
+import { Camera, MapPin, Briefcase, Mail, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
+import Post from './Post';
+import EmptyState from './EmptyState';
 
 export default function Profile({ session }) {
   const { id: routeId } = useParams();
@@ -24,6 +26,9 @@ export default function Profile({ session }) {
     location: '',
     bio: ''
   });
+  const [posts, setPosts] = useState([]);
+  const [loadingPosts, setLoadingPosts] = useState(true);
+  const [lightboxImage, setLightboxImage] = useState(null);
 
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
@@ -69,10 +74,138 @@ export default function Profile({ session }) {
     }
   };
 
+  const fetchUserPosts = async () => {
+    try {
+      setLoadingPosts(true);
+      const { data: postsData, error: postsError } = await supabase
+        .from('posts')
+        .select(`
+          *,
+          profiles (full_name, avatar_url, role),
+          likes (user_id),
+          comments (*, profiles (full_name, avatar_url), comment_likes (user_id)),
+          original:original_post_id (
+            id, content, image_url, created_at,
+            profiles (full_name, avatar_url)
+          )
+        `)
+        .eq('user_id', profileId)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (postsError) throw postsError;
+
+      const formattedPosts = (postsData || []).map((post) => ({
+        ...post,
+        isLiked: post.likes.some((like) => like.user_id === session.user.id),
+        likesCount: post.likes.length,
+        commentsCount: post.comments?.length || 0,
+        showComments: false,
+        newComment: ''
+      }));
+
+      setPosts(formattedPosts);
+    } catch (err) {
+      console.error('Erro ao buscar posts do usuario:', err);
+    } finally {
+      setLoadingPosts(false);
+    }
+  };
+
   useEffect(() => {
     fetchProfileData();
+    fetchUserPosts();
     setEditing(false); // Reseta modo de edição se mudar de perfil
   }, [profileId]);
+
+  // Funcoes para interagir com o Post (reutilizadas do Feed adaptadas)
+  const handleDeletePost = async (postId) => {
+    if (!confirm('Tem certeza que deseja excluir esta publicação?')) return;
+    try {
+      const { error } = await supabase.from('posts').delete().eq('id', postId);
+      if (error) throw error;
+      setPosts(posts.filter(p => p.id !== postId));
+      setStats(prev => ({ ...prev, posts: prev.posts > 0 ? prev.posts - 1 : 0 }));
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleLike = async (postId, isLiked) => {
+    try {
+      if (isLiked) {
+        await supabase.from('likes').delete().match({ post_id: postId, user_id: session.user.id });
+        setPosts(posts.map(p => p.id === postId ? { ...p, isLiked: false, likesCount: p.likesCount - 1 } : p));
+      } else {
+        await supabase.from('likes').insert([{ post_id: postId, user_id: session.user.id }]);
+        setPosts(posts.map(p => p.id === postId ? { ...p, isLiked: true, likesCount: p.likesCount + 1 } : p));
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const toggleComments = (postId) => {
+    setPosts(posts.map(p => p.id === postId ? { ...p, showComments: !p.showComments } : p));
+  };
+
+  const handleCommentChange = (postId, text) => {
+    setPosts(posts.map(p => p.id === postId ? { ...p, newComment: text } : p));
+  };
+
+  const handleCommentSubmit = async (postId, content) => {
+    if (!content.trim()) return;
+    try {
+      const { data, error } = await supabase.from('comments')
+        .insert([{ post_id: postId, user_id: session.user.id, content: content.trim() }])
+        .select('*, profiles (full_name, avatar_url), comment_likes (user_id)')
+        .single();
+      if (error) throw error;
+
+      setPosts(posts.map(p => {
+        if (p.id !== postId) return p;
+        return {
+          ...p,
+          comments: [...(p.comments || []), data],
+          commentsCount: p.commentsCount + 1,
+          newComment: ''
+        };
+      }));
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleCommentLike = async (postId, commentId, isLiked) => {
+    try {
+      if (isLiked) {
+        await supabase.from('comment_likes').delete().match({ comment_id: commentId, user_id: session.user.id });
+        setPosts(posts.map(p => p.id === postId ? { ...p, comments: p.comments.map(c => c.id === commentId ? { ...c, comment_likes: c.comment_likes.filter(l => l.user_id !== session.user.id) } : c) } : p));
+      } else {
+        await supabase.from('comment_likes').insert([{ comment_id: commentId, user_id: session.user.id }]);
+        setPosts(posts.map(p => p.id === postId ? { ...p, comments: p.comments.map(c => c.id === commentId ? { ...c, comment_likes: [...(c.comment_likes || []), { user_id: session.user.id }] } : c) } : p));
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleRepost = async (postToRepost) => {
+    if (!confirm('Deseja compartilhar esta publicação?')) return;
+    try {
+      const originalId = postToRepost.is_repost ? postToRepost.original_post_id : postToRepost.id;
+      const { error } = await supabase.from('posts').insert([{
+        user_id: session.user.id,
+        content: ' ',
+        is_repost: true,
+        original_post_id: originalId
+      }]);
+      if (error) throw error;
+      alert('Compartilhado com sucesso!');
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -331,6 +464,60 @@ export default function Profile({ session }) {
           )}
         </div>
       </div>
+
+      {!editing && (
+        <div className="mt-6 space-y-4">
+          <h2 className="text-lg font-bold text-gray-900 px-1">Publicações de {profile.full_name}</h2>
+
+          {loadingPosts ? (
+            <div className="text-center py-8 text-gray-500">Carregando publicações...</div>
+          ) : posts.length === 0 ? (
+            <EmptyState
+              title="Nenhuma publicação"
+              description={isMyProfile ? "Você ainda não fez nenhuma publicação." : "Este usuário ainda não publicou nada."}
+            />
+          ) : (
+            <div className="space-y-4">
+              {posts.map(post => (
+                <Post
+                  key={post.id}
+                  post={post}
+                  session={session}
+                  profile={{...profile, avatar_url: profile.avatar_url}} // Profile context for commenting
+                  onDelete={handleDeletePost}
+                  onLike={handleLike}
+                  onCommentToggle={toggleComments}
+                  onCommentChange={handleCommentChange}
+                  onCommentSubmit={handleCommentSubmit}
+                  onRepost={handleRepost}
+                  onImageClick={setLightboxImage}
+                  onCommentLike={handleCommentLike}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {lightboxImage && (
+        <div
+          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4 backdrop-blur-sm"
+          onClick={() => setLightboxImage(null)}
+        >
+          <button
+            className="absolute top-4 right-4 text-white hover:text-gray-300 p-2 z-50"
+            onClick={() => setLightboxImage(null)}
+          >
+            <X className="w-8 h-8" />
+          </button>
+          <img
+            src={lightboxImage}
+            alt="Fullscreen"
+            className="max-w-full max-h-[90vh] object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   );
 }
