@@ -14,7 +14,7 @@ export default function Profile({ session }) {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
 
-  // Stats
+  // Stats & Connections
   const [stats, setStats] = useState({ connections: 0, posts: 0 });
 
   // Edit form state
@@ -54,7 +54,14 @@ export default function Profile({ session }) {
         .select('*', { count: 'exact', head: true })
         .eq('user_id', profileId);
 
-      setStats(prev => ({ ...prev, posts: postsCount || 0 }));
+      // Conta conexões
+      const { data: connData } = await supabase
+        .from('connections')
+        .select('follower_id, following_id')
+        .eq('status', 'accepted')
+        .or(`follower_id.eq.${profileId},following_id.eq.${profileId}`);
+
+      setStats(prev => ({ ...prev, posts: postsCount || 0, connections: connData?.length || 0 }));
     } catch(err) {
       console.error(err);
     } finally {
@@ -265,7 +272,11 @@ export default function Profile({ session }) {
               </div>
 
               <div className="flex gap-4 border-t border-gray-100 pt-4">
-                <div className="text-center">
+                <div className="text-center cursor-pointer hover:opacity-80">
+                  <span className="block font-bold text-gray-900">{stats.connections}</span>
+                  <span className="text-xs text-gray-500">Conexões</span>
+                </div>
+                <div className="text-center cursor-pointer hover:opacity-80">
                   <span className="block font-bold text-gray-900">{stats.posts}</span>
                   <span className="text-xs text-gray-500">Posts</span>
                 </div>

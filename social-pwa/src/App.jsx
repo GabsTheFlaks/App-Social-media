@@ -7,14 +7,7 @@ import Feed from './components/Feed';
 import Profile from './components/Profile';
 import Network from './components/Network';
 import Login from './components/Login';
-
-function Notifications() {
-  return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center py-12 text-gray-500">
-      <p>Nenhuma notificação nova no momento.</p>
-    </div>
-  );
-}
+import Notifications from './components/Notifications';
 
 function App() {
   const [session, setSession] = useState(null);
@@ -63,7 +56,7 @@ function App() {
         <Route path="/" element={<Layout session={session} />}>
           <Route index element={<Feed session={session} />} />
           <Route path="network" element={<Network session={session} />} />
-          <Route path="notifications" element={<Notifications />} />
+          <Route path="notifications" element={<Notifications session={session} />} />
           <Route path="profile" element={<Profile session={session} />} />
           <Route path="profile/:id" element={<Profile session={session} />} />
           <Route path="*" element={<Navigate to="/" replace />} />
