@@ -9,7 +9,14 @@ const navItems = [
   { path: '/profile', icon: User, label: 'Perfil' },
 ];
 
+import { LogOut } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+
 export default function Layout() {
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+  };
+
   return (
     <div className="flex h-screen bg-gray-50 flex-col md:flex-row overflow-hidden">
       {/* Sidebar for Desktop */}
@@ -36,13 +43,27 @@ export default function Layout() {
             </NavLink>
           ))}
         </nav>
+
+        {/* Logout Desktop */}
+        <div className="p-4 border-t border-gray-200">
+          <button
+            onClick={handleLogout}
+            className="flex items-center space-x-3 p-3 w-full text-left text-gray-600 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors"
+          >
+            <LogOut className="w-5 h-5" />
+            <span className="font-medium">Sair</span>
+          </button>
+        </div>
       </aside>
 
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto w-full pb-16 md:pb-0">
         {/* Mobile Header */}
-        <header className="md:hidden bg-white border-b border-gray-200 p-4 sticky top-0 z-10">
+        <header className="md:hidden bg-white border-b border-gray-200 p-4 sticky top-0 z-10 flex justify-between items-center">
           <h1 className="text-xl font-bold text-primary-600">SocialPWA</h1>
+          <button onClick={handleLogout} className="text-gray-500 p-2">
+            <LogOut className="w-5 h-5" />
+          </button>
         </header>
 
         <div className="max-w-3xl mx-auto p-4">
