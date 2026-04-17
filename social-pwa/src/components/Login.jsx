@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 
 export default function Login() {
   const [isRegistering, setIsRegistering] = useState(false);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
@@ -11,6 +12,28 @@ export default function Login() {
   const [error, setError] = useState(null);
 
   const navigate = useNavigate();
+
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    if (!email) {
+      setError('Por favor, informe seu email para recuperar a senha.');
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin,
+      });
+      if (error) throw error;
+      alert('Se uma conta existir com esse email, você receberá um link de recuperação.');
+      setIsForgotPassword(false);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -63,7 +86,11 @@ export default function Login() {
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-primary-600 mb-2">SocialPWA</h1>
           <p className="text-gray-500">
-            {isRegistering ? 'Crie sua conta na rede.' : 'Conecte-se com profissionais do mundo todo.'}
+            {isForgotPassword
+              ? 'Recupere sua senha.'
+              : isRegistering
+                ? 'Crie sua conta na rede.'
+                : 'Conecte-se com profissionais do mundo todo.'}
           </p>
         </div>
 
@@ -73,7 +100,41 @@ export default function Login() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        {isForgotPassword ? (
+          <form onSubmit={handleForgotPassword} className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
+                placeholder="seu@email.com"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-primary-600 hover:bg-primary-700 text-white font-semibold py-3 rounded-lg transition-colors shadow-md hover:shadow-lg disabled:opacity-50"
+            >
+              {loading ? 'Enviando...' : 'Enviar link de recuperação'}
+            </button>
+            <div className="text-center mt-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsForgotPassword(false);
+                  setError(null);
+                }}
+                className="text-primary-600 hover:underline text-sm font-medium"
+              >
+                Voltar para o Login
+              </button>
+            </div>
+          </form>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-6">
           {isRegistering && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Nome Completo</label>
@@ -117,20 +178,35 @@ export default function Login() {
             {loading ? 'Aguarde...' : isRegistering ? 'Criar Conta' : 'Entrar'}
           </button>
         </form>
+        )}
 
-        <div className="mt-6 text-center">
-          <button
-            onClick={() => {
-              setIsRegistering(!isRegistering);
-              setError(null);
-            }}
-            className="text-primary-600 hover:underline text-sm font-medium"
-          >
-            {isRegistering
-              ? 'Já tem uma conta? Faça login'
-              : 'Não tem conta? Cadastre-se'}
-          </button>
-        </div>
+        {!isForgotPassword && (
+          <div className="mt-6 text-center flex flex-col space-y-3">
+            <button
+              onClick={() => {
+                setIsRegistering(!isRegistering);
+                setError(null);
+              }}
+              className="text-primary-600 hover:underline text-sm font-medium"
+            >
+              {isRegistering
+                ? 'Já tem uma conta? Faça login'
+                : 'Não tem conta? Cadastre-se'}
+            </button>
+
+            {!isRegistering && (
+              <button
+                onClick={() => {
+                  setIsForgotPassword(true);
+                  setError(null);
+                }}
+                className="text-gray-500 hover:text-gray-700 text-sm"
+              >
+                Esqueceu sua senha?
+              </button>
+            )}
+          </div>
+        )}
 
         <div className="mt-6 pt-6 border-t border-gray-100 hidden">
            {/* Futura integração com OAuth (Google) */}

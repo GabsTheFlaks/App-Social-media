@@ -5,7 +5,7 @@ import { supabase } from './lib/supabase';
 import Layout from './components/Layout';
 import Feed from './components/Feed';
 import Profile from './components/Profile';
-import Network from './components/Network';
+import NetworkLayout from './components/NetworkLayout';
 import Login from './components/Login';
 import Notifications from './components/Notifications';
 
@@ -55,7 +55,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Layout session={session} />}>
           <Route index element={<Feed session={session} />} />
-          <Route path="network" element={<Network session={session} />} />
+          <Route path="network" element={<NetworkLayout session={session} />} />
           <Route path="notifications" element={<Notifications session={session} />} />
           <Route path="profile" element={<Profile session={session} />} />
           <Route path="profile/:id" element={<Profile session={session} />} />

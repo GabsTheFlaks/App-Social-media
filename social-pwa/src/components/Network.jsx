@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { UserPlus, Check, X, Clock, UserCheck } from 'lucide-react';
+import { UserPlus, Check, X, Clock, UserCheck, Search, MessageSquare } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
-export default function Network({ session }) {
+export default function Network({ session, onOpenChat }) {
   const [users, setUsers] = useState([]);
   const [connections, setConnections] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const fetchData = async () => {
     try {
@@ -91,7 +92,6 @@ export default function Network({ session }) {
     }
   };
 
-  // Helper para descobrir o status da conexão com um determinado usuário
   const getConnectionStatus = (targetUserId) => {
     const conn = connections.find(
       c => (c.follower_id === session.user.id && c.following_id === targetUserId) ||
@@ -106,16 +106,37 @@ export default function Network({ session }) {
 
   if (loading) return <div className="text-center p-8">Carregando rede...</div>;
 
-  // Filtra convites recebidos e pendentes
   const pendingRequests = connections.filter(
     c => c.following_id === session.user.id && c.status === 'pending'
+  );
+
+  // Filtrar usuários com base na busca
+  const filteredUsers = users.filter(user =>
+    (user.full_name?.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    (user.role?.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   return (
     <div className="space-y-6">
 
-      {/* Convites Recebidos */}
-      {pendingRequests.length > 0 && (
+      {/* Barra de Busca (Nova) */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-2 flex items-center">
+        <Search className="w-5 h-5 text-gray-400 ml-2" />
+        <input
+          type="text"
+          placeholder="Buscar pessoas por nome ou cargo..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="flex-1 bg-transparent border-none focus:ring-0 text-sm p-2"
+        />
+        {searchQuery && (
+          <button onClick={() => setSearchQuery('')} className="p-2 text-gray-400 hover:text-gray-600">
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+
+      {pendingRequests.length > 0 && !searchQuery && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
           <h2 className="text-lg font-bold text-gray-900 mb-4">Convites Pendentes</h2>
           <div className="space-y-4">
@@ -153,13 +174,13 @@ export default function Network({ session }) {
         </div>
       )}
 
-      {/* Sugestões de Conexão */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-        <h2 className="text-lg font-bold text-gray-900 mb-4">Pessoas que você talvez conheça</h2>
+        <h2 className="text-lg font-bold text-gray-900 mb-4">
+          {searchQuery ? 'Resultados da Busca' : 'Pessoas que você talvez conheça'}
+        </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {users.map(user => {
+          {filteredUsers.map(user => {
             const status = getConnectionStatus(user.id);
-            // Pega o ID da conexão para usar nos botões de cancelar
             const conn = connections.find(
                c => (c.follower_id === session.user.id && c.following_id === user.id) ||
                     (c.following_id === session.user.id && c.follower_id === user.id)
@@ -193,11 +214,11 @@ export default function Network({ session }) {
 
                 {status === 'accepted' && (
                   <button
-                    disabled
-                    className="w-full flex items-center justify-center gap-2 py-1.5 bg-gray-100 text-gray-600 rounded-full font-medium text-sm cursor-default"
+                    onClick={() => onOpenChat(user)}
+                    className="w-full flex items-center justify-center gap-2 py-1.5 bg-primary-100 text-primary-700 hover:bg-primary-200 transition-colors rounded-full font-medium text-sm"
                   >
-                    <UserCheck className="w-4 h-4" />
-                    Conectado
+                    <MessageSquare className="w-4 h-4" />
+                    Mensagem
                   </button>
                 )}
 
@@ -211,9 +232,10 @@ export default function Network({ session }) {
             );
           })}
 
-          {users.length === 0 && (
-            <div className="col-span-full text-center py-8 text-gray-500">
-              Nenhum outro usuário encontrado na rede.
+          {filteredUsers.length === 0 && (
+            <div className="col-span-full flex flex-col items-center justify-center p-8 text-center text-gray-500">
+              <Search className="w-12 h-12 text-gray-300 mb-3" />
+              <p className="text-sm">Nenhum usuário encontrado na busca.</p>
             </div>
           )}
         </div>
