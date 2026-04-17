@@ -27,15 +27,21 @@ export default function Layout({ session }) {
 
     fetchUnread();
 
-    const channel = supabase.channel('layout-notifications')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${session?.user?.id}` }, fetchUnread)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'notifications', filter: `user_id=eq.${session?.user?.id}` }, fetchUnread);
+    const channelId = `layout-notifications-${session?.user?.id}`;
+    let channel = supabase.getChannels().find(c => c.topic === `realtime:${channelId}`);
 
-    channel.subscribe();
+    if (!channel) {
+      channel = supabase.channel(channelId);
+      channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${session?.user?.id}` }, fetchUnread)
+             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'notifications', filter: `user_id=eq.${session?.user?.id}` }, fetchUnread);
+      channel.subscribe();
+    }
 
     return () => {
       isMounted = false;
-      supabase.removeChannel(channel);
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
     };
   }, [session?.user?.id]);
 

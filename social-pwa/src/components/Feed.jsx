@@ -32,59 +32,56 @@ export default function Feed({ session }) {
 
   const fetchPosts = async () => {
     try {
-      // Busca posts com autor e total de likes
-      // Busca posts com autor, curtidas, comentários e repost original
       const { data: postsData, error: postsError } = await supabase
         .from('posts')
         .select(`
           *,
-          profiles!posts_user_id_fkey ( full_name, role, avatar_url ),
-          likes ( user_id ),
-          comments (
-            id,
-            content,
-            created_at,
-            profiles ( full_name, avatar_url )
-          ),
-          original_post:repost_id (
-            id,
-            content,
-            image_url,
-            created_at,
-            profiles!posts_user_id_fkey ( id, full_name, avatar_url )
+          profiles (full_name, avatar_url, role),
+          likes (user_id),
+          comments (*, profiles (full_name, avatar_url)),
+          original:original_post_id (
+            id, content, image_url, created_at,
+            profiles (full_name, avatar_url)
           )
         `)
         .order('created_at', { ascending: false });
 
       if (postsError) throw postsError;
 
-      // Formata dados para UI
-      const formattedPosts = postsData.map(post => {
-        // Ordena comentários do mais antigo para o mais novo
-        const sortedComments = (post.comments || []).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+      // Filtrar por visibilidade (se é conexoes, verificar se tem conexão aceita)
+      let finalPosts = postsData;
 
-        return {
-          ...post,
-          author: post.profiles?.full_name || 'Usuário Desconhecido',
-          role: post.profiles?.role || 'Membro',
-          avatar: post.profiles?.avatar_url,
-          likes_count: post.likes.length,
-          liked_by_me: post.likes.some(like => like.user_id === session.user.id),
-          is_repost: !!post.repost_id,
-          original: post.original_post,
-          comments: sortedComments.map(c => ({
-            id: c.id,
-            content: c.content,
-            created_at: c.created_at,
-            author: c.profiles?.full_name,
-            avatar: c.profiles?.avatar_url
-          }))
-        };
+      const { data: myConnections } = await supabase
+        .from('connections')
+        .select('following_id, follower_id')
+        .eq('status', 'accepted')
+        .or(`follower_id.eq.${session.user.id},following_id.eq.${session.user.id}`);
+
+      const connectionIds = myConnections?.map(c =>
+        c.follower_id === session.user.id ? c.following_id : c.follower_id
+      ) || [];
+
+      finalPosts = postsData.filter(post => {
+        if (post.user_id === session.user.id) return true;
+        if (post.visibility === 'public') return true;
+        if (post.visibility === 'connections') {
+          return connectionIds.includes(post.user_id);
+        }
+        return false;
       });
 
+      const formattedPosts = finalPosts.map((post) => ({
+        ...post,
+        isLiked: post.likes.some((like) => like.user_id === session.user.id),
+        likesCount: post.likes.length,
+        commentsCount: post.comments?.length || 0,
+        showComments: false,
+        newComment: ''
+      }));
+
       setPosts(formattedPosts);
-    } catch (err) {
-      console.error("Erro ao buscar posts:", err);
+    } catch (error) {
+      console.error('Erro ao buscar posts:', error);
     } finally {
       setLoading(false);
     }
@@ -95,37 +92,46 @@ export default function Feed({ session }) {
     fetchPosts();
 
     // Inscreve-se para atualizações no banco (tempo real)
-    const channel = supabase.channel('feed-posts-likes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, fetchPosts)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'likes' }, fetchPosts);
+    const channelId = `feed-posts-likes-${session.user.id}`;
+    let channel = supabase.getChannels().find(c => c.topic === `realtime:${channelId}`);
 
-    channel.subscribe();
+    if (!channel) {
+      channel = supabase.channel(channelId);
+      channel.on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, fetchPosts)
+             .on('postgres_changes', { event: '*', schema: 'public', table: 'likes' }, fetchPosts)
+             .on('postgres_changes', { event: '*', schema: 'public', table: 'comments' }, fetchPosts);
+      channel.subscribe();
+    }
 
     return () => {
-      supabase.removeChannel(channel);
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
     };
   }, [session.user.id]);
 
   const handleImageUpload = async (file) => {
-    try {
-      setUploadingImage(true);
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random()}.${fileExt}`;
-      const filePath = `${session.user.id}/${fileName}`;
+    if (!file) return null;
 
+    setUploadingImage(true);
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${session.user.id}-${Math.random()}.${fileExt}`;
+    const filePath = `${session.user.id}/${fileName}`;
+
+    try {
       const { error: uploadError } = await supabase.storage
-        .from('post_images')
+        .from('posts-images')
         .upload(filePath, file);
 
       if (uploadError) throw uploadError;
 
       const { data: publicUrlData } = supabase.storage
-        .from('post_images')
+        .from('posts-images')
         .getPublicUrl(filePath);
 
       return publicUrlData.publicUrl;
     } catch (error) {
-      console.error('Erro no upload de imagem', error);
+      console.error('Erro no upload:', error);
       alert('Erro ao fazer upload da imagem.');
       return null;
     } finally {
@@ -135,7 +141,8 @@ export default function Feed({ session }) {
 
   const handlePost = async (e) => {
     e.preventDefault();
-    if ((!newPost.trim() && !selectedImage) || posting || uploadingImage) return;
+    if (!newPost.trim() && !selectedImage) return;
+
     setPosting(true);
 
     try {
@@ -144,386 +151,359 @@ export default function Feed({ session }) {
         imageUrl = await handleImageUpload(selectedImage);
       }
 
-      // Se não houver texto, passamos uma string vazia para não quebrar a restrição "not null"
-      // ou atualizamos o banco para permitir. Vamos passar string vazia por segurança.
-      const contentToSave = newPost.trim() ? newPost : ' ';
-
-      const { error } = await supabase
-        .from('posts')
-        .insert([{
+      const { error } = await supabase.from('posts').insert([
+        {
           user_id: session.user.id,
-          content: contentToSave,
+          content: newPost.trim() || ' ',
           image_url: imageUrl,
           visibility: visibility
-        }]);
+        },
+      ]);
 
       if (error) throw error;
       setNewPost('');
       setSelectedImage(null);
-    } catch (err) {
-      console.error('Erro ao postar:', err);
-      alert('Não foi possível enviar a publicação.');
+      fetchPosts();
+    } catch (error) {
+      console.error('Erro ao postar:', error);
+      alert('Ocorreu um erro ao criar a publicação.');
     } finally {
       setPosting(false);
     }
   };
 
-  const toggleLike = async (postId, currentlyLiked) => {
-    // Atualização Otimista
-    setPosts(currentPosts => currentPosts.map(p => {
-      if (p.id === postId) {
-        return {
-          ...p,
-          liked_by_me: !currentlyLiked,
-          likes_count: currentlyLiked ? p.likes_count - 1 : p.likes_count + 1
-        };
-      }
-      return p;
-    }));
-
-    try {
-      if (currentlyLiked) {
-        await supabase
-          .from('likes')
-          .delete()
-          .match({ post_id: postId, user_id: session.user.id });
-      } else {
-        await supabase
-          .from('likes')
-          .insert([{ post_id: postId, user_id: session.user.id }]);
-      }
-    } catch (err) {
-      console.error('Erro ao curtir:', err);
-      // O ideal seria reverter a atualização otimista aqui em caso de erro.
+  const handleLike = async (postId, isLiked) => {
+    if (isLiked) {
+      await supabase
+        .from('likes')
+        .delete()
+        .eq('post_id', postId)
+        .eq('user_id', session.user.id);
+    } else {
+      await supabase.from('likes').insert([
+        { post_id: postId, user_id: session.user.id },
+      ]);
     }
+    fetchPosts(); // Recarrega para atualizar contador
   };
 
-  const deletePost = async (postId) => {
-    if(!window.confirm("Apagar esta publicação?")) return;
+  const handleDeletePost = async (postId) => {
+    if(!window.confirm("Deseja realmente apagar esta publicação?")) return;
 
-    // Atualização otimista
-    setPosts(currentPosts => currentPosts.filter(p => p.id !== postId));
-
-    try {
-      await supabase.from('posts').delete().eq('id', postId);
-    } catch(err) {
-      console.error(err);
-    }
-  }
-
-  // Estado para controlar qual post está com a área de comentários aberta
-  const [activeCommentPost, setActiveCommentPost] = useState(null);
-  const [commentText, setCommentText] = useState('');
-  const [commenting, setCommenting] = useState(false);
-
-  const handleRepost = async (postId) => {
-    if(!window.confirm("Deseja repostar esta publicação no seu perfil?")) return;
     try {
       const { error } = await supabase
         .from('posts')
-        .insert([{
-          user_id: session.user.id,
-          content: ' ',
-          repost_id: postId,
-          visibility: 'public' // Ou o mesmo do original
-        }]);
+        .delete()
+        .eq('id', postId)
+        .eq('user_id', session.user.id);
 
       if (error) throw error;
-      alert("Publicação repostada com sucesso!");
-    } catch(err) {
-      console.error(err);
-      alert("Erro ao repostar.");
+      fetchPosts();
+    } catch (err) {
+      console.error("Erro ao deletar", err);
     }
-  }
+  };
 
-  const handleComment = async (e, postId) => {
-    e.preventDefault();
-    if (!commentText.trim() || commenting) return;
-    setCommenting(true);
+  // Funções de Comentários
+  const toggleComments = (postId) => {
+    setPosts(posts.map(p => p.id === postId ? { ...p, showComments: !p.showComments } : p));
+  };
+
+  const handleCommentChange = (postId, text) => {
+    setPosts(posts.map(p => p.id === postId ? { ...p, newComment: text } : p));
+  };
+
+  const submitComment = async (postId, content) => {
+    if (!content.trim()) return;
 
     try {
-      const { data: newCommentData, error } = await supabase
-        .from('comments')
-        .insert([{ post_id: postId, user_id: session.user.id, content: commentText }])
-        .select(`
-          id,
-          content,
-          created_at,
-          profiles ( full_name, avatar_url )
-        `)
-        .single();
+      const { error } = await supabase.from('comments').insert([
+        { post_id: postId, user_id: session.user.id, content: content.trim() }
+      ]);
 
       if (error) throw error;
 
-      // Atualização Otimista do Comentário
-      const formattedComment = {
-        id: newCommentData.id,
-        content: newCommentData.content,
-        created_at: newCommentData.created_at,
-        author: newCommentData.profiles?.full_name,
-        avatar: newCommentData.profiles?.avatar_url
-      };
+      // Limpar o campo
+      setPosts(posts.map(p => p.id === postId ? { ...p, newComment: '' } : p));
+      fetchPosts(); // recarregar com o novo comentario
+    } catch(err) {
+      console.error("Erro ao comentar", err);
+    }
+  };
 
-      setPosts(currentPosts => currentPosts.map(p => {
-        if (p.id === postId) {
-          return { ...p, comments: [...p.comments, formattedComment] };
+  // Função de Repost / Compartilhamento
+  const handleRepost = async (post) => {
+    if(!window.confirm("Deseja repostar esta publicação no seu perfil?")) return;
+
+    try {
+      const originalId = post.is_repost ? post.original_post_id : post.id;
+
+      const { error } = await supabase.from('posts').insert([
+        {
+          user_id: session.user.id,
+          content: '', // Reposts puros não tem conteúdo próprio inicialmente
+          is_repost: true,
+          original_post_id: originalId,
+          visibility: 'public'
         }
-        return p;
-      }));
+      ]);
 
-      setCommentText('');
-    } catch (err) {
-      console.error('Erro ao comentar:', err);
-    } finally {
-      setCommenting(false);
+      if (error) throw error;
+      alert("Publicação compartilhada!");
+      fetchPosts();
+    } catch(err) {
+      console.error("Erro ao compartilhar", err);
     }
   };
 
   return (
-    <div className="space-y-4">
-      {/* Create Post */}
+    <div className="space-y-6 max-w-2xl mx-auto">
+      {/* Create Post Area */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
         <form onSubmit={handlePost}>
-          <div className="flex gap-3">
+          <div className="flex gap-4">
             <img
-              src={profile?.avatar_url || 'https://i.pravatar.cc/150'}
-              alt="Seu Avatar"
-              className="w-10 h-10 rounded-full"
+              src={profile?.avatar_url || `https://ui-avatars.com/api/?name=${session.user.email}`}
+              alt="Avatar"
+              className="w-12 h-12 rounded-full object-cover border border-gray-200"
             />
-            <textarea
-              value={newPost}
-              onChange={(e) => setNewPost(e.target.value)}
-              placeholder="Sobre o que você quer falar?"
-              className="w-full resize-none border-none focus:ring-0 text-gray-700 bg-gray-50 rounded-lg p-3 min-h-[80px]"
-            />
-          </div>
-
-          {selectedImage && (
-            <div className="mt-3 relative inline-block">
-              <img
-                src={URL.createObjectURL(selectedImage)}
-                alt="Preview"
-                className="h-32 rounded-lg object-cover"
+            <div className="flex-1 space-y-3">
+              <textarea
+                value={newPost}
+                onChange={(e) => setNewPost(e.target.value)}
+                placeholder="Sobre o que você quer falar?"
+                className="w-full bg-transparent border-none focus:ring-0 resize-none text-gray-800 placeholder-gray-500 min-h-[60px]"
+                rows="2"
               />
-              <button
-                type="button"
-                onClick={() => setSelectedImage(null)}
-                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
-          )}
 
-          <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-100">
-            <div className="flex items-center gap-2">
-              <label className="text-gray-500 hover:text-primary-600 cursor-pointer flex items-center gap-2 p-2 rounded-lg hover:bg-primary-50 transition-colors">
-                <ImageIcon className="w-5 h-5" />
-                <span className="text-sm font-medium hidden sm:inline">Mídia</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    if(e.target.files && e.target.files[0]) setSelectedImage(e.target.files[0])
-                  }}
-                />
-              </label>
+              {selectedImage && (
+                <div className="relative inline-block mt-2">
+                  <img
+                    src={URL.createObjectURL(selectedImage)}
+                    alt="Preview"
+                    className="max-h-64 rounded-lg border border-gray-200 object-contain"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setSelectedImage(null)}
+                    className="absolute top-2 right-2 bg-black/60 text-white p-1 rounded-full hover:bg-black/80"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
 
-              <div className="relative group">
+              <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-2 text-gray-500 hover:text-primary-600 hover:bg-primary-50 px-3 py-2 rounded-full transition-colors cursor-pointer">
+                    <ImageIcon className="w-5 h-5" />
+                    <span className="text-sm font-medium hidden sm:inline">Mídia</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          setSelectedImage(e.target.files[0]);
+                        }
+                      }}
+                    />
+                  </label>
+
+                  {/* Seletor de Visibilidade */}
+                  <select
+                    value={visibility}
+                    onChange={(e) => setVisibility(e.target.value)}
+                    className="text-xs text-gray-500 bg-gray-50 border-none rounded-full py-1.5 px-3 cursor-pointer hover:bg-gray-100 focus:ring-0"
+                  >
+                    <option value="public">🌍 Público</option>
+                    <option value="connections">👥 Conexões</option>
+                  </select>
+                </div>
+
                 <button
-                  type="button"
-                  className="text-gray-500 hover:text-primary-600 flex items-center gap-2 p-2 rounded-lg hover:bg-primary-50 transition-colors"
-                  onClick={() => setVisibility(v => v === 'public' ? 'connections' : 'public')}
+                  type="submit"
+                  disabled={(!newPost.trim() && !selectedImage) || posting || uploadingImage}
+                  className="bg-primary-600 text-white px-5 py-2 rounded-full font-medium text-sm hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
-                  {visibility === 'public' ? <Globe className="w-4 h-4" /> : <Users className="w-4 h-4" />}
-                  <span className="text-sm font-medium hidden sm:inline">
-                    {visibility === 'public' ? 'Público' : 'Conexões'}
-                  </span>
+                  {(posting || uploadingImage) ? 'Publicando...' : (
+                    <>
+                      <span>Publicar</span>
+                      <Send className="w-4 h-4" />
+                    </>
+                  )}
                 </button>
               </div>
             </div>
-
-            <button
-              type="submit"
-              disabled={(!newPost.trim() && !selectedImage) || posting || uploadingImage}
-              className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-full font-medium text-sm flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {posting || uploadingImage ? 'Enviando...' : 'Publicar'}
-              <Send className="w-4 h-4" />
-            </button>
           </div>
         </form>
       </div>
 
-      {/* Feed List */}
+      {/* Feed Area */}
       <div className="space-y-4">
         {loading ? (
-          // Skeleton Loader
-          Array(3).fill(0).map((_, i) => (
-            <div key={i} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 animate-pulse">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 bg-gray-200 rounded-full"></div>
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 bg-gray-200 rounded w-1/4"></div>
-                  <div className="h-3 bg-gray-200 rounded w-1/3"></div>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <div className="h-4 bg-gray-200 rounded w-full"></div>
-                <div className="h-4 bg-gray-200 rounded w-5/6"></div>
-              </div>
-            </div>
-          ))
+          <div className="text-center py-8 text-gray-500">Carregando feed...</div>
         ) : posts.length === 0 ? (
-          <div className="text-center py-10 text-gray-500 bg-white rounded-xl shadow-sm border border-gray-100">
-            Nenhuma publicação encontrada. Seja o primeiro a postar!
+          <div className="text-center py-8 text-gray-500 bg-white rounded-xl border border-gray-100">
+            Nenhuma publicação ainda. Seja o primeiro a postar!
           </div>
         ) : (
-          posts.map(post => (
-            <article key={post.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+          posts.map((post) => (
+            <div key={post.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 transition-all">
+              {/* Indica Repost */}
               {post.is_repost && (
-                <div className="flex items-center gap-2 text-xs text-gray-500 font-medium mb-3 pb-2 border-b border-gray-50">
+                <div className="flex items-center gap-2 text-xs text-gray-500 mb-3 pb-2 border-b border-gray-50">
                   <Repeat2 className="w-4 h-4" />
-                  <span>{post.author} repostou</span>
-                  {post.user_id === session.user.id && (
-                    <button onClick={() => deletePost(post.id)} className="ml-auto text-gray-400 hover:text-red-500">
-                      Excluir
-                    </button>
-                  )}
+                  <span>{post.profiles?.full_name} compartilhou isso</span>
                 </div>
               )}
 
+              {/* Post Header (Usa dados do original se for repost puro, ou do dono se houver comentário extra - futuramente) */}
               <div className="flex justify-between items-start mb-3">
-                <div className="flex items-start gap-3">
-                  <Link to={`/profile/${post.is_repost ? post.original?.profiles?.id : post.user_id}`}>
-                    <img
-                      src={post.is_repost ? post.original?.profiles?.avatar_url : post.avatar}
-                      alt={post.is_repost ? post.original?.profiles?.full_name : post.author}
-                      className="w-12 h-12 rounded-full hover:ring-2 ring-primary-500 transition-all"
-                    />
-                  </Link>
+                <Link to={`/profile/${post.is_repost ? post.original?.profiles?.id || post.original_post_id : post.user_id}`} className="flex items-center gap-3 group">
+                  <img
+                    src={post.is_repost ? post.original?.profiles?.avatar_url : post.profiles?.avatar_url}
+                    alt="User"
+                    className="w-10 h-10 rounded-full object-cover border border-gray-100 group-hover:opacity-80 transition"
+                  />
                   <div>
-                    <Link to={`/profile/${post.is_repost ? post.original?.profiles?.id : post.user_id}`} className="hover:underline">
-                      <h3 className="font-semibold text-gray-900">
-                        {post.is_repost ? post.original?.profiles?.full_name : post.author}
-                      </h3>
-                    </Link>
-                    {!post.is_repost && <p className="text-xs text-gray-500">{post.role}</p>}
-                    <div className="flex items-center gap-1 text-xs text-gray-400 capitalize mt-0.5">
+                    <h3 className="font-bold text-gray-900 text-sm group-hover:text-primary-600 transition">
+                      {post.is_repost ? post.original?.profiles?.full_name : post.profiles?.full_name}
+                    </h3>
+                    <div className="flex items-center gap-1.5 text-xs text-gray-500">
                       <span>{dayjs(post.is_repost ? post.original?.created_at : post.created_at).fromNow()}</span>
                       <span>•</span>
                       {post.visibility === 'public' ? <Globe className="w-3 h-3" /> : <Users className="w-3 h-3" />}
                     </div>
                   </div>
-                </div>
-                {!post.is_repost && post.user_id === session.user.id && (
-                  <button onClick={() => deletePost(post.id)} className="text-gray-400 hover:text-red-500 p-1">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                </Link>
+                {post.user_id === session.user.id && (
+                   <button
+                     onClick={() => handleDeletePost(post.id)}
+                     className="text-gray-400 hover:text-red-500 p-1"
+                     title="Excluir"
+                   >
+                     <Trash2 className="w-4 h-4" />
+                   </button>
                 )}
               </div>
 
-              {/* Conteúdo do post (original ou do próprio post se não for repost) */}
-              <p className="text-gray-800 mb-4 whitespace-pre-wrap">
-                {post.is_repost ? post.original?.content : post.content}
-              </p>
+              {/* Post Content */}
+              <div className="mb-4">
+                <p className="text-gray-800 text-sm md:text-base whitespace-pre-wrap leading-relaxed">
+                  {post.is_repost ? post.original?.content : post.content}
+                </p>
+              </div>
 
-              {((post.is_repost ? post.original?.image_url : post.image_url)) && (
+              {/* Post Image */}
+              {(post.image_url || (post.is_repost && post.original?.image_url)) && (
                 <div
                   className="mb-4 rounded-xl overflow-hidden bg-gray-100 cursor-pointer"
                   onClick={() => setLightboxImage(post.is_repost ? post.original?.image_url : post.image_url)}
                 >
                   <img
                     src={post.is_repost ? post.original?.image_url : post.image_url}
-                    alt="Post image"
-                    className="w-full object-cover max-h-96 hover:scale-105 transition-transform duration-500"
+                    alt="Post attachment"
+                    className="w-full max-h-96 object-contain hover:scale-[1.02] transition-transform duration-300"
                   />
                 </div>
               )}
 
-              <div className="flex items-center gap-4 text-xs text-gray-500 mb-3 px-1">
-                <span>{post.likes_count} {post.likes_count === 1 ? 'curtida' : 'curtidas'}</span>
-                <span>{post.comments?.length || 0} {(post.comments?.length === 1) ? 'comentário' : 'comentários'}</span>
+              {/* Stats Bar */}
+              <div className="flex items-center justify-between text-xs text-gray-500 border-b border-gray-100 pb-2 mb-2 px-1">
+                <div className="flex items-center gap-1">
+                  {post.likesCount > 0 && (
+                    <>
+                      <div className="bg-primary-100 text-primary-600 p-0.5 rounded-full">
+                        <Heart className="w-3 h-3 fill-current" />
+                      </div>
+                      <span>{post.likesCount}</span>
+                    </>
+                  )}
+                </div>
+                <div className="flex gap-3">
+                  {post.commentsCount > 0 && <span>{post.commentsCount} comentários</span>}
+                </div>
               </div>
 
-              <div className="flex justify-between items-center pt-2 border-t border-gray-100">
+              {/* Action Buttons */}
+              <div className="flex gap-1 pt-1">
                 <button
-                  onClick={() => toggleLike(post.id, post.liked_by_me)}
+                  onClick={() => handleLike(post.id, post.isLiked)}
                   className={clsx(
-                    "flex-1 flex justify-center items-center gap-2 py-2 rounded-lg transition-colors",
-                    post.liked_by_me ? "text-primary-600 hover:bg-primary-50" : "text-gray-500 hover:bg-gray-50"
+                    'flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-colors',
+                    post.isLiked
+                      ? 'text-primary-600 bg-primary-50'
+                      : 'text-gray-600 hover:bg-gray-50'
                   )}
                 >
-                  <Heart className={clsx("w-5 h-5", post.liked_by_me && "fill-current")} />
-                  <span className="font-medium text-sm">Curtir</span>
+                  <Heart className={clsx('w-5 h-5', post.isLiked && 'fill-current')} />
+                  <span>Curtir</span>
                 </button>
                 <button
-                  onClick={() => setActiveCommentPost(activeCommentPost === post.id ? null : post.id)}
-                  className={clsx(
-                    "flex-1 flex justify-center items-center gap-2 py-2 rounded-lg transition-colors",
-                    activeCommentPost === post.id ? "text-primary-600 bg-primary-50" : "text-gray-500 hover:bg-gray-50"
-                  )}
+                  onClick={() => toggleComments(post.id)}
+                  className="flex-1 flex items-center justify-center gap-2 py-2 text-gray-600 hover:bg-gray-50 rounded-lg text-sm font-medium transition-colors"
                 >
                   <MessageCircle className="w-5 h-5" />
-                  <span className="font-medium text-sm hidden sm:inline">Comentar</span>
+                  <span>Comentar</span>
                 </button>
                 <button
-                  onClick={() => handleRepost(post.is_repost ? post.repost_id : post.id)}
-                  className="flex-1 flex justify-center items-center gap-2 py-2 text-gray-500 hover:bg-gray-50 rounded-lg transition-colors"
+                  onClick={() => handleRepost(post)}
+                  className="flex-1 flex items-center justify-center gap-2 py-2 text-gray-600 hover:bg-gray-50 rounded-lg text-sm font-medium transition-colors"
                 >
-                  <Repeat2 className="w-5 h-5" />
-                  <span className="font-medium text-sm hidden sm:inline">Repostar</span>
+                  <Share2 className="w-5 h-5" />
+                  <span>Compartilhar</span>
                 </button>
               </div>
 
-              {/* Seção de Comentários (Expandida) */}
-              {activeCommentPost === post.id && (
-                <div className="mt-4 pt-4 border-t border-gray-100">
-                  {/* Lista de Comentários */}
-                  <div className="space-y-3 mb-4 max-h-60 overflow-y-auto pr-2">
+              {/* Comments Section */}
+              {post.showComments && (
+                <div className="mt-4 pt-4 border-t border-gray-100 space-y-4">
+                  {/* Create Comment */}
+                  <div className="flex gap-3">
+                    <img
+                      src={profile?.avatar_url}
+                      alt="Me"
+                      className="w-8 h-8 rounded-full object-cover"
+                    />
+                    <div className="flex-1 flex gap-2">
+                      <input
+                        type="text"
+                        value={post.newComment || ''}
+                        onChange={(e) => handleCommentChange(post.id, e.target.value)}
+                        placeholder="Adicione um comentário..."
+                        className="flex-1 bg-gray-100 border-none rounded-full px-4 py-2 text-sm focus:ring-1 focus:ring-primary-500"
+                        onKeyPress={(e) => e.key === 'Enter' && submitComment(post.id, post.newComment)}
+                      />
+                      <button
+                        onClick={() => submitComment(post.id, post.newComment)}
+                        disabled={!post.newComment?.trim()}
+                        className="text-primary-600 disabled:opacity-50 p-2"
+                      >
+                        <Send className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* List Comments */}
+                  <div className="space-y-3 pl-11">
                     {post.comments?.map(comment => (
                       <div key={comment.id} className="flex gap-2">
-                        <img src={comment.avatar || 'https://i.pravatar.cc/150'} alt={comment.author} className="w-8 h-8 rounded-full" />
-                        <div className="flex-1 bg-gray-50 p-3 rounded-2xl rounded-tl-none">
-                          <div className="flex justify-between items-baseline mb-1">
-                            <span className="font-semibold text-sm text-gray-900">{comment.author}</span>
-                            <span className="text-[10px] text-gray-400">{dayjs(comment.created_at).fromNow(true)}</span>
-                          </div>
-                          <p className="text-sm text-gray-700 whitespace-pre-wrap">{comment.content}</p>
+                        <img
+                          src={comment.profiles?.avatar_url}
+                          alt="User"
+                          className="w-7 h-7 rounded-full object-cover"
+                        />
+                        <div className="bg-gray-100 rounded-2xl rounded-tl-none px-3 py-2 text-sm">
+                          <span className="font-bold text-gray-900 block">{comment.profiles?.full_name}</span>
+                          <span className="text-gray-800">{comment.content}</span>
                         </div>
                       </div>
                     ))}
-                    {post.comments?.length === 0 && (
-                      <p className="text-center text-sm text-gray-500 py-2">Seja o primeiro a comentar.</p>
-                    )}
                   </div>
-
-                  {/* Input de Novo Comentário */}
-                  <form onSubmit={(e) => handleComment(e, post.id)} className="flex gap-2 items-center">
-                    <img
-                      src={profile?.avatar_url || 'https://i.pravatar.cc/150'}
-                      alt="Seu Avatar"
-                      className="w-8 h-8 rounded-full"
-                    />
-                    <input
-                      type="text"
-                      value={commentText}
-                      onChange={(e) => setCommentText(e.target.value)}
-                      placeholder="Escreva um comentário..."
-                      className="flex-1 bg-gray-100 border-none text-sm rounded-full px-4 py-2 focus:ring-2 focus:ring-primary-500 outline-none"
-                    />
-                    <button
-                      type="submit"
-                      disabled={!commentText.trim() || commenting}
-                      className="p-2 text-primary-600 hover:bg-primary-50 rounded-full disabled:opacity-50 transition-colors"
-                    >
-                      <Send className="w-5 h-5" />
-                    </button>
-                  </form>
                 </div>
               )}
-            </article>
+            </div>
           ))
         )}
       </div>
