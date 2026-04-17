@@ -1,8 +1,15 @@
 import { useState, useEffect } from 'react';
-import { Mail, Briefcase, MapPin, Edit3, Camera } from 'lucide-react';
+import { Mail, Briefcase, MapPin, Edit3, Camera, ImageIcon } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { useParams } from 'react-router-dom';
 
 export default function Profile({ session }) {
+  const { id: routeId } = useParams();
+
+  // Se existir id na rota, vemos o perfil da pessoa, senão, o nosso.
+  const profileId = routeId || session.user.id;
+  const isMyProfile = profileId === session.user.id;
+
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
@@ -19,14 +26,16 @@ export default function Profile({ session }) {
   });
 
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
 
   const fetchProfileData = async () => {
     try {
+      setLoading(true);
       // Pega perfil
       const { data: profileData } = await supabase
         .from('profiles')
         .select('*')
-        .eq('id', session.user.id)
+        .eq('id', profileId)
         .single();
 
       if (profileData) {
@@ -43,7 +52,7 @@ export default function Profile({ session }) {
       const { count: postsCount } = await supabase
         .from('posts')
         .select('*', { count: 'exact', head: true })
-        .eq('user_id', session.user.id);
+        .eq('user_id', profileId);
 
       setStats(prev => ({ ...prev, posts: postsCount || 0 }));
     } catch(err) {
@@ -55,7 +64,8 @@ export default function Profile({ session }) {
 
   useEffect(() => {
     fetchProfileData();
-  }, [session.user.id]);
+    setEditing(false); // Reseta modo de edição se mudar de perfil
+  }, [profileId]);
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -71,6 +81,44 @@ export default function Profile({ session }) {
     } catch(err) {
       console.error(err);
       alert('Erro ao salvar perfil');
+    }
+  };
+
+  const handleCoverUpload = async (e) => {
+    try {
+      if (!e.target.files || e.target.files.length === 0) return;
+
+      setUploadingCover(true);
+      const file = e.target.files[0];
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${session.user.id}-${Math.random()}.${fileExt}`;
+      const filePath = `${session.user.id}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('covers')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: publicUrlData } = supabase.storage
+        .from('covers')
+        .getPublicUrl(filePath);
+
+      const coverUrl = publicUrlData.publicUrl;
+
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ cover_url: coverUrl })
+        .eq('id', session.user.id);
+
+      if (updateError) throw updateError;
+
+      setProfile(prev => ({ ...prev, cover_url: coverUrl }));
+    } catch (error) {
+      console.error('Erro ao atualizar foto de capa', error);
+      alert('Erro ao fazer upload da capa.');
+    } finally {
+      setUploadingCover(false);
     }
   };
 
@@ -123,10 +171,27 @@ export default function Profile({ session }) {
     <div className="space-y-4">
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative">
         {/* Cover Photo */}
-        <div className="h-32 md:h-48 w-full bg-primary-100 relative">
-          <button className="absolute top-2 right-2 bg-white/80 p-2 rounded-full hover:bg-white transition" title="Em breve">
-            <Edit3 className="w-4 h-4 text-gray-700" />
-          </button>
+        <div className="h-32 md:h-48 w-full bg-primary-100 relative group">
+          {profile.cover_url && (
+             <img src={profile.cover_url} alt="Capa" className="w-full h-full object-cover" />
+          )}
+          {isMyProfile && (
+            <label className="absolute top-2 right-2 bg-white/80 p-2 rounded-full hover:bg-white transition cursor-pointer shadow-sm z-10">
+              <Camera className="w-4 h-4 text-gray-700" />
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleCoverUpload}
+                disabled={uploadingCover}
+              />
+            </label>
+          )}
+          {uploadingCover && (
+             <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+                <span className="text-white text-sm font-medium drop-shadow-md">Atualizando...</span>
+             </div>
+          )}
         </div>
 
         {/* Profile Info */}
@@ -138,31 +203,36 @@ export default function Profile({ session }) {
                 alt={profile.full_name}
                 className={`w-24 h-24 md:w-32 md:h-32 rounded-full border-4 border-white bg-white object-cover ${uploadingAvatar ? 'opacity-50' : ''}`}
               />
-              <label className="absolute bottom-0 right-0 bg-primary-600 text-white p-2 rounded-full cursor-pointer hover:bg-primary-700 transition shadow-md">
-                <Camera className="w-4 h-4" />
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleAvatarUpload}
-                  disabled={uploadingAvatar}
-                />
-              </label>
+              {isMyProfile && (
+                <label className="absolute bottom-0 right-0 bg-primary-600 text-white p-2 rounded-full cursor-pointer hover:bg-primary-700 transition shadow-md">
+                  <Camera className="w-4 h-4" />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleAvatarUpload}
+                    disabled={uploadingAvatar}
+                  />
+                </label>
+              )}
             </div>
-            {!editing ? (
-              <button
-                onClick={() => setEditing(true)}
-                className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-2 rounded-full font-medium text-sm transition-colors"
-              >
-                Editar Perfil
-              </button>
-            ) : (
-              <button
-                onClick={() => setEditing(false)}
-                className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-6 py-2 rounded-full font-medium text-sm transition-colors"
-              >
-                Cancelar
-              </button>
+
+            {isMyProfile && (
+              !editing ? (
+                <button
+                  onClick={() => setEditing(true)}
+                  className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-2 rounded-full font-medium text-sm transition-colors"
+                >
+                  Editar Perfil
+                </button>
+              ) : (
+                <button
+                  onClick={() => setEditing(false)}
+                  className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-6 py-2 rounded-full font-medium text-sm transition-colors"
+                >
+                  Cancelar
+                </button>
+              )
             )}
           </div>
 
@@ -186,10 +256,12 @@ export default function Profile({ session }) {
                   <Briefcase className="w-4 h-4" />
                   <span>{profile.role || 'Adicione seu cargo atual'}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Mail className="w-4 h-4" />
-                  <span>{session.user.email}</span>
-                </div>
+                {isMyProfile && (
+                  <div className="flex items-center gap-2">
+                    <Mail className="w-4 h-4" />
+                    <span>{session.user.email}</span>
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-4 border-t border-gray-100 pt-4">
