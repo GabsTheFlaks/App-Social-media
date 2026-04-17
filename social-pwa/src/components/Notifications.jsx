@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Heart, UserPlus, MessageCircle, CheckCircle2 } from 'lucide-react';
+import { Heart, UserPlus, MessageCircle, CheckCircle2, Share2, Bell } from 'lucide-react';
+import EmptyState from './EmptyState';
 import { supabase } from '../lib/supabase';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -67,6 +68,8 @@ export default function Notifications({ session }) {
       case 'comment': return <MessageCircle className="w-5 h-5 text-primary-500" />;
       case 'connection_request': return <UserPlus className="w-5 h-5 text-blue-500" />;
       case 'connection_accepted': return <CheckCircle2 className="w-5 h-5 text-green-500" />;
+      case 'repost': return <Share2 className="w-5 h-5 text-indigo-500" />;
+      case 'message': return <MessageCircle className="w-5 h-5 text-teal-500" />;
       default: return <MessageCircle className="w-5 h-5 text-gray-500" />;
     }
   };
@@ -78,6 +81,8 @@ export default function Notifications({ session }) {
       case 'comment': return <><span className="font-bold">{name}</span> comentou na sua publicação.</>;
       case 'connection_request': return <><span className="font-bold">{name}</span> enviou um convite de conexão.</>;
       case 'connection_accepted': return <><span className="font-bold">{name}</span> aceitou seu convite.</>;
+      case 'repost': return <><span className="font-bold">{name}</span> compartilhou sua publicação.</>;
+      case 'message': return <><span className="font-bold">{name}</span> enviou uma mensagem para você.</>;
       default: return <><span className="font-bold">{name}</span> interagiu com você.</>;
     }
   };
@@ -92,8 +97,12 @@ export default function Notifications({ session }) {
 
       <div className="divide-y divide-gray-50">
         {notifications.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">
-            Você não tem novas notificações.
+          <div className="p-4">
+            <EmptyState
+              icon={Bell}
+              title="Nenhuma notificação"
+              description="Você ainda não tem novas notificações."
+            />
           </div>
         ) : (
           notifications.map((notif) => (
