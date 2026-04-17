@@ -47,14 +47,29 @@ export default function Chat({ session, onBack, selectedUser }) {
       channel.on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
-        table: 'messages',
-        filter: `sender_id=in.(${session.user.id},${selectedUser.id})`
+        table: 'messages'
       }, (payload) => {
-        // Verifica dupla se a mensagem pertence a essa conversa (Supabase filter as vezes aceita parcialmente dependendo da regra)
         const msg = payload.new;
+        // Check if the message belongs to this conversation
         if ((msg.sender_id === session.user.id && msg.receiver_id === selectedUser.id) ||
             (msg.sender_id === selectedUser.id && msg.receiver_id === session.user.id)) {
-          setMessages(prev => [...prev, msg]);
+
+          setMessages(prev => {
+            // Deduplicate: Check if we already have this message (by id or a temp optimistic id)
+            // Realtime might fire multiple times or after optimistic UI
+            if (prev.find(m => m.id === msg.id)) return prev;
+            // Also deduplicate optimistic messages by content and recent time
+            const isOptimisticDuplicate = prev.find(m =>
+               m.id.toString().includes('.') && // Match optimistic IDs like '0.123'
+               m.content === msg.content &&
+               m.sender_id === msg.sender_id
+            );
+            if (isOptimisticDuplicate) {
+                // Replace optimistic with real message
+                return prev.map(m => m === isOptimisticDuplicate ? msg : m);
+            }
+            return [...prev, msg];
+          });
           scrollToBottom();
         }
       });
@@ -77,19 +92,36 @@ export default function Chat({ session, onBack, selectedUser }) {
     if (!newMessage.trim()) return;
 
     const contentToSend = newMessage.trim();
-    setNewMessage('');
 
-    // Remove optimistic update to avoid duplicate messages since realtime is fast enough
+    // Optimistic UI update
+    const tempId = Math.random().toString();
+    const tempMessage = {
+      id: tempId,
+      sender_id: session.user.id,
+      receiver_id: selectedUser.id,
+      content: contentToSend,
+      created_at: new Date().toISOString(),
+      read: false
+    };
+
+    setMessages(prev => [...prev, tempMessage]);
+    setNewMessage('');
+    scrollToBottom();
+
     try {
       const { error } = await supabase.from('messages').insert([{
         sender_id: session.user.id,
         receiver_id: selectedUser.id,
         content: contentToSend
       }]);
-      if (error) throw error;
-      scrollToBottom();
+      if (error) {
+        // Revert optimistic update on error
+        setMessages(prev => prev.filter(m => m.id !== tempId));
+        throw error;
+      }
     } catch (err) {
       console.error('Erro ao enviar mensagem:', err);
+      alert('Erro ao enviar mensagem. Tente novamente.');
     }
   };
 
