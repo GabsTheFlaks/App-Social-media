@@ -15,6 +15,8 @@ export default function Feed({ session }) {
   const [newPost, setNewPost] = useState('');
   const [posting, setPosting] = useState(false);
   const [profile, setProfile] = useState(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
 
   const fetchProfile = async () => {
     const { data } = await supabase
@@ -28,26 +30,45 @@ export default function Feed({ session }) {
   const fetchPosts = async () => {
     try {
       // Busca posts com autor e total de likes
+      // Busca posts com autor, curtidas e comentários
       const { data: postsData, error: postsError } = await supabase
         .from('posts')
         .select(`
           *,
           profiles ( full_name, role, avatar_url ),
-          likes ( user_id )
+          likes ( user_id ),
+          comments (
+            id,
+            content,
+            created_at,
+            profiles ( full_name, avatar_url )
+          )
         `)
         .order('created_at', { ascending: false });
 
       if (postsError) throw postsError;
 
       // Formata dados para UI
-      const formattedPosts = postsData.map(post => ({
-        ...post,
-        author: post.profiles?.full_name || 'Usuário Desconhecido',
-        role: post.profiles?.role || 'Membro',
-        avatar: post.profiles?.avatar_url,
-        likes_count: post.likes.length,
-        liked_by_me: post.likes.some(like => like.user_id === session.user.id),
-      }));
+      const formattedPosts = postsData.map(post => {
+        // Ordena comentários do mais antigo para o mais novo
+        const sortedComments = (post.comments || []).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+        return {
+          ...post,
+          author: post.profiles?.full_name || 'Usuário Desconhecido',
+          role: post.profiles?.role || 'Membro',
+          avatar: post.profiles?.avatar_url,
+          likes_count: post.likes.length,
+          liked_by_me: post.likes.some(like => like.user_id === session.user.id),
+          comments: sortedComments.map(c => ({
+            id: c.id,
+            content: c.content,
+            created_at: c.created_at,
+            author: c.profiles?.full_name,
+            avatar: c.profiles?.avatar_url
+          }))
+        };
+      });
 
       setPosts(formattedPosts);
     } catch (err) {
@@ -72,18 +93,51 @@ export default function Feed({ session }) {
     };
   }, [session.user.id]);
 
+  const handleImageUpload = async (file) => {
+    try {
+      setUploadingImage(true);
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random()}.${fileExt}`;
+      const filePath = `${session.user.id}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('post_images')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: publicUrlData } = supabase.storage
+        .from('post_images')
+        .getPublicUrl(filePath);
+
+      return publicUrlData.publicUrl;
+    } catch (error) {
+      console.error('Erro no upload de imagem', error);
+      alert('Erro ao fazer upload da imagem.');
+      return null;
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
   const handlePost = async (e) => {
     e.preventDefault();
-    if (!newPost.trim() || posting) return;
+    if ((!newPost.trim() && !selectedImage) || posting || uploadingImage) return;
     setPosting(true);
 
     try {
+      let imageUrl = null;
+      if (selectedImage) {
+        imageUrl = await handleImageUpload(selectedImage);
+      }
+
       const { error } = await supabase
         .from('posts')
-        .insert([{ user_id: session.user.id, content: newPost }]);
+        .insert([{ user_id: session.user.id, content: newPost, image_url: imageUrl }]);
 
       if (error) throw error;
       setNewPost('');
+      setSelectedImage(null);
     } catch (err) {
       console.error('Erro ao postar:', err);
       alert('Não foi possível enviar a publicação.');
@@ -135,6 +189,54 @@ export default function Feed({ session }) {
     }
   }
 
+  // Estado para controlar qual post está com a área de comentários aberta
+  const [activeCommentPost, setActiveCommentPost] = useState(null);
+  const [commentText, setCommentText] = useState('');
+  const [commenting, setCommenting] = useState(false);
+
+  const handleComment = async (e, postId) => {
+    e.preventDefault();
+    if (!commentText.trim() || commenting) return;
+    setCommenting(true);
+
+    try {
+      const { data: newCommentData, error } = await supabase
+        .from('comments')
+        .insert([{ post_id: postId, user_id: session.user.id, content: commentText }])
+        .select(`
+          id,
+          content,
+          created_at,
+          profiles ( full_name, avatar_url )
+        `)
+        .single();
+
+      if (error) throw error;
+
+      // Atualização Otimista do Comentário
+      const formattedComment = {
+        id: newCommentData.id,
+        content: newCommentData.content,
+        created_at: newCommentData.created_at,
+        author: newCommentData.profiles?.full_name,
+        avatar: newCommentData.profiles?.avatar_url
+      };
+
+      setPosts(currentPosts => currentPosts.map(p => {
+        if (p.id === postId) {
+          return { ...p, comments: [...p.comments, formattedComment] };
+        }
+        return p;
+      }));
+
+      setCommentText('');
+    } catch (err) {
+      console.error('Erro ao comentar:', err);
+    } finally {
+      setCommenting(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Create Post */}
@@ -153,17 +255,43 @@ export default function Feed({ session }) {
               className="w-full resize-none border-none focus:ring-0 text-gray-700 bg-gray-50 rounded-lg p-3 min-h-[80px]"
             />
           </div>
+
+          {selectedImage && (
+            <div className="mt-3 relative inline-block">
+              <img
+                src={URL.createObjectURL(selectedImage)}
+                alt="Preview"
+                className="h-32 rounded-lg object-cover"
+              />
+              <button
+                type="button"
+                onClick={() => setSelectedImage(null)}
+                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
           <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-100">
-            <button type="button" className="text-gray-400 cursor-not-allowed flex items-center gap-2 p-2 rounded-lg" title="Upload de fotos indisponível nesta versão">
+            <label className="text-gray-500 hover:text-primary-600 cursor-pointer flex items-center gap-2 p-2 rounded-lg hover:bg-primary-50 transition-colors">
               <ImageIcon className="w-5 h-5" />
-              <span className="text-sm font-medium hidden sm:inline">Mídia (Em breve)</span>
-            </button>
+              <span className="text-sm font-medium hidden sm:inline">Mídia</span>
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  if(e.target.files && e.target.files[0]) setSelectedImage(e.target.files[0])
+                }}
+              />
+            </label>
             <button
               type="submit"
-              disabled={!newPost.trim() || posting}
+              disabled={(!newPost.trim() && !selectedImage) || posting || uploadingImage}
               className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-full font-medium text-sm flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {posting ? 'Enviando...' : 'Publicar'}
+              {posting || uploadingImage ? 'Enviando...' : 'Publicar'}
               <Send className="w-4 h-4" />
             </button>
           </div>
@@ -213,9 +341,15 @@ export default function Feed({ session }) {
               </div>
               <p className="text-gray-800 mb-4 whitespace-pre-wrap">{post.content}</p>
 
+              {post.image_url && (
+                <div className="mb-4 rounded-xl overflow-hidden bg-gray-100">
+                  <img src={post.image_url} alt="Post image" className="w-full object-contain max-h-96" />
+                </div>
+              )}
+
               <div className="flex items-center gap-4 text-xs text-gray-500 mb-3 px-1">
                 <span>{post.likes_count} {post.likes_count === 1 ? 'curtida' : 'curtidas'}</span>
-                <span>0 comentários</span>
+                <span>{post.comments?.length || 0} {(post.comments?.length === 1) ? 'comentário' : 'comentários'}</span>
               </div>
 
               <div className="flex justify-between items-center pt-2 border-t border-gray-100">
@@ -229,7 +363,13 @@ export default function Feed({ session }) {
                   <Heart className={clsx("w-5 h-5", post.liked_by_me && "fill-current")} />
                   <span className="font-medium text-sm">Curtir</span>
                 </button>
-                <button className="flex-1 flex justify-center items-center gap-2 py-2 text-gray-400 cursor-not-allowed rounded-lg transition-colors">
+                <button
+                  onClick={() => setActiveCommentPost(activeCommentPost === post.id ? null : post.id)}
+                  className={clsx(
+                    "flex-1 flex justify-center items-center gap-2 py-2 rounded-lg transition-colors",
+                    activeCommentPost === post.id ? "text-primary-600 bg-primary-50" : "text-gray-500 hover:bg-gray-50"
+                  )}
+                >
                   <MessageCircle className="w-5 h-5" />
                   <span className="font-medium text-sm hidden sm:inline">Comentar</span>
                 </button>
@@ -238,6 +378,53 @@ export default function Feed({ session }) {
                   <span className="font-medium text-sm hidden sm:inline">Compartilhar</span>
                 </button>
               </div>
+
+              {/* Seção de Comentários (Expandida) */}
+              {activeCommentPost === post.id && (
+                <div className="mt-4 pt-4 border-t border-gray-100">
+                  {/* Lista de Comentários */}
+                  <div className="space-y-3 mb-4 max-h-60 overflow-y-auto pr-2">
+                    {post.comments?.map(comment => (
+                      <div key={comment.id} className="flex gap-2">
+                        <img src={comment.avatar || 'https://i.pravatar.cc/150'} alt={comment.author} className="w-8 h-8 rounded-full" />
+                        <div className="flex-1 bg-gray-50 p-3 rounded-2xl rounded-tl-none">
+                          <div className="flex justify-between items-baseline mb-1">
+                            <span className="font-semibold text-sm text-gray-900">{comment.author}</span>
+                            <span className="text-[10px] text-gray-400">{dayjs(comment.created_at).fromNow(true)}</span>
+                          </div>
+                          <p className="text-sm text-gray-700 whitespace-pre-wrap">{comment.content}</p>
+                        </div>
+                      </div>
+                    ))}
+                    {post.comments?.length === 0 && (
+                      <p className="text-center text-sm text-gray-500 py-2">Seja o primeiro a comentar.</p>
+                    )}
+                  </div>
+
+                  {/* Input de Novo Comentário */}
+                  <form onSubmit={(e) => handleComment(e, post.id)} className="flex gap-2 items-center">
+                    <img
+                      src={profile?.avatar_url || 'https://i.pravatar.cc/150'}
+                      alt="Seu Avatar"
+                      className="w-8 h-8 rounded-full"
+                    />
+                    <input
+                      type="text"
+                      value={commentText}
+                      onChange={(e) => setCommentText(e.target.value)}
+                      placeholder="Escreva um comentário..."
+                      className="flex-1 bg-gray-100 border-none text-sm rounded-full px-4 py-2 focus:ring-2 focus:ring-primary-500 outline-none"
+                    />
+                    <button
+                      type="submit"
+                      disabled={!commentText.trim() || commenting}
+                      className="p-2 text-primary-600 hover:bg-primary-50 rounded-full disabled:opacity-50 transition-colors"
+                    >
+                      <Send className="w-5 h-5" />
+                    </button>
+                  </form>
+                </div>
+              )}
             </article>
           ))
         )}

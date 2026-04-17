@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Mail, Briefcase, MapPin, Edit3 } from 'lucide-react';
+import { Mail, Briefcase, MapPin, Edit3, Camera } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 export default function Profile({ session }) {
@@ -17,6 +17,8 @@ export default function Profile({ session }) {
     location: '',
     bio: ''
   });
+
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   const fetchProfileData = async () => {
     try {
@@ -72,6 +74,48 @@ export default function Profile({ session }) {
     }
   };
 
+  const handleAvatarUpload = async (e) => {
+    try {
+      if (!e.target.files || e.target.files.length === 0) return;
+
+      setUploadingAvatar(true);
+      const file = e.target.files[0];
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${session.user.id}-${Math.random()}.${fileExt}`;
+      const filePath = `${session.user.id}/${fileName}`;
+
+      // Upload no Storage
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      // Pega URL Publica
+      const { data: publicUrlData } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      const avatarUrl = publicUrlData.publicUrl;
+
+      // Atualiza o Perfil
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: avatarUrl })
+        .eq('id', session.user.id);
+
+      if (updateError) throw updateError;
+
+      setProfile(prev => ({ ...prev, avatar_url: avatarUrl }));
+      alert('Foto de perfil atualizada!');
+    } catch (error) {
+      console.error('Erro ao atualizar foto', error);
+      alert('Erro ao fazer upload da imagem.');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
   if (loading) return <div className="text-center p-8">Carregando perfil...</div>;
   if (!profile) return <div className="text-center p-8">Perfil não encontrado.</div>;
 
@@ -88,11 +132,23 @@ export default function Profile({ session }) {
         {/* Profile Info */}
         <div className="px-4 pb-4">
           <div className="relative flex justify-between items-end -mt-12 md:-mt-16 mb-4">
-            <img
-              src={profile.avatar_url}
-              alt={profile.full_name}
-              className="w-24 h-24 md:w-32 md:h-32 rounded-full border-4 border-white bg-white"
-            />
+            <div className="relative">
+              <img
+                src={profile.avatar_url}
+                alt={profile.full_name}
+                className={`w-24 h-24 md:w-32 md:h-32 rounded-full border-4 border-white bg-white object-cover ${uploadingAvatar ? 'opacity-50' : ''}`}
+              />
+              <label className="absolute bottom-0 right-0 bg-primary-600 text-white p-2 rounded-full cursor-pointer hover:bg-primary-700 transition shadow-md">
+                <Camera className="w-4 h-4" />
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleAvatarUpload}
+                  disabled={uploadingAvatar}
+                />
+              </label>
+            </div>
             {!editing ? (
               <button
                 onClick={() => setEditing(true)}
