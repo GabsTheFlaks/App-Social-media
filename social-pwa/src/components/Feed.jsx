@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Heart, MessageCircle, Share2, Image as ImageIcon, Send, Trash2, Globe, Users, Repeat2 } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Image as ImageIcon, Send, Trash2, Globe, Users, Repeat2, X } from 'lucide-react';
 import clsx from 'clsx';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -19,6 +19,7 @@ export default function Feed({ session }) {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
   const [visibility, setVisibility] = useState('public');
+  const [lightboxImage, setLightboxImage] = useState(null);
 
   const fetchProfile = async () => {
     const { data } = await supabase
@@ -428,11 +429,14 @@ export default function Feed({ session }) {
               </p>
 
               {((post.is_repost ? post.original?.image_url : post.image_url)) && (
-                <div className="mb-4 rounded-xl overflow-hidden bg-gray-100">
+                <div
+                  className="mb-4 rounded-xl overflow-hidden bg-gray-100 cursor-pointer"
+                  onClick={() => setLightboxImage(post.is_repost ? post.original?.image_url : post.image_url)}
+                >
                   <img
                     src={post.is_repost ? post.original?.image_url : post.image_url}
                     alt="Post image"
-                    className="w-full object-contain max-h-96"
+                    className="w-full object-cover max-h-96 hover:scale-105 transition-transform duration-500"
                   />
                 </div>
               )}
@@ -522,6 +526,27 @@ export default function Feed({ session }) {
           ))
         )}
       </div>
+
+      {/* Lightbox para imagem em tela cheia */}
+      {lightboxImage && (
+        <div
+          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4 backdrop-blur-sm"
+          onClick={() => setLightboxImage(null)}
+        >
+          <button
+            className="absolute top-4 right-4 text-white hover:text-gray-300 p-2 z-50"
+            onClick={() => setLightboxImage(null)}
+          >
+            <X className="w-8 h-8" />
+          </button>
+          <img
+            src={lightboxImage}
+            alt="Fullscreen"
+            className="max-w-full max-h-[90vh] object-contain"
+            onClick={(e) => e.stopPropagation()} // Impede que o clique na imagem feche o modal
+          />
+        </div>
+      )}
     </div>
   );
 }

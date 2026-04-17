@@ -1,21 +1,49 @@
+import { useState, useEffect } from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
-import { Home, Users, Bell, User } from 'lucide-react';
+import { Home, Users, Bell, User, LogOut } from 'lucide-react';
 import clsx from 'clsx';
-
-const navItems = [
-  { path: '/', icon: Home, label: 'Home' },
-  { path: '/network', icon: Users, label: 'Rede' },
-  { path: '/notifications', icon: Bell, label: 'Notificações' },
-  { path: '/profile', icon: User, label: 'Perfil' },
-];
-
-import { LogOut } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
-export default function Layout() {
+export default function Layout({ session }) {
+  const [unreadCount, setUnreadCount] = useState(0);
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
   };
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchUnread = async () => {
+      if (!session?.user?.id) return;
+      const { count } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', session.user.id)
+        .eq('read', false);
+
+      if (isMounted) setUnreadCount(count || 0);
+    };
+
+    fetchUnread();
+
+    const channel = supabase.channel('schema-db-changes')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${session?.user?.id}` }, fetchUnread)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'notifications', filter: `user_id=eq.${session?.user?.id}` }, fetchUnread)
+      .subscribe();
+
+    return () => {
+      isMounted = false;
+      supabase.removeChannel(channel);
+    };
+  }, [session?.user?.id]);
+
+  const navItems = [
+    { path: '/', icon: Home, label: 'Home' },
+    { path: '/network', icon: Users, label: 'Rede' },
+    { path: '/notifications', icon: Bell, label: 'Notificações', badge: unreadCount },
+    { path: '/profile', icon: User, label: 'Perfil' },
+  ];
 
   return (
     <div className="flex h-screen bg-gray-50 flex-col md:flex-row overflow-hidden">
@@ -38,7 +66,14 @@ export default function Layout() {
                 )
               }
             >
-              <item.icon className="w-5 h-5" />
+              <div className="relative">
+                <item.icon className="w-5 h-5" />
+                {item.badge > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                    {item.badge}
+                  </span>
+                )}
+              </div>
               <span className="font-medium">{item.label}</span>
             </NavLink>
           ))}
@@ -79,12 +114,19 @@ export default function Layout() {
             to={item.path}
             className={({ isActive }) =>
               clsx(
-                'flex flex-col items-center p-2 rounded-lg',
+                'flex flex-col items-center p-2 rounded-lg relative',
                 isActive ? 'text-primary-600' : 'text-gray-500'
               )
             }
           >
-            <item.icon className="w-6 h-6" />
+            <div className="relative">
+              <item.icon className="w-6 h-6" />
+              {item.badge > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm ring-2 ring-white">
+                  {item.badge}
+                </span>
+              )}
+            </div>
             <span className="text-xs mt-1">{item.label}</span>
           </NavLink>
         ))}
