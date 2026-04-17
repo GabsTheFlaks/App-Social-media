@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Image as ImageIcon, Send, Users, X, Loader2 } from 'lucide-react';
+import { Image as ImageIcon, Send, Users, X, Loader2, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import Post from './Post';
@@ -53,7 +53,7 @@ export default function Feed({ session }) {
           profiles (full_name, avatar_url, role),
           likes (user_id),
           comments (*, profiles (full_name, avatar_url), comment_likes (user_id)),
-          original:original_post_id (
+          original:posts!original_post_id (
             id, content, image_url, created_at,
             profiles (full_name, avatar_url)
           )
