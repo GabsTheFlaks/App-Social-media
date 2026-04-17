@@ -215,19 +215,42 @@ export default function Feed({ session }) {
   };
 
   const handleLike = async (postId, isLiked) => {
-    if (isLiked) {
-      await supabase
-        .from('likes')
-        .delete()
-        .eq('post_id', postId)
-        .eq('user_id', session.user.id);
-    } else {
-      await supabase.from('likes').insert([
-        { post_id: postId, user_id: session.user.id },
-      ]);
+    try {
+      // Optimistic Update
+      setPosts(currentPosts => currentPosts.map(p => {
+        if (p.id !== postId) return p;
+        return {
+          ...p,
+          isLiked: !isLiked,
+          likesCount: isLiked ? p.likesCount - 1 : p.likesCount + 1
+        };
+      }));
+
+      if (isLiked) {
+        const { error } = await supabase
+          .from('likes')
+          .delete()
+          .eq('post_id', postId)
+          .eq('user_id', session.user.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('likes').insert([
+          { post_id: postId, user_id: session.user.id },
+        ]);
+        if (error) throw error;
+      }
+    } catch (error) {
+      console.error('Erro ao curtir post:', error);
+      // Revert in case of error (simplification: let a refresh fix it or manually revert here)
+      setPosts(currentPosts => currentPosts.map(p => {
+        if (p.id !== postId) return p;
+        return {
+          ...p,
+          isLiked: isLiked, // revert
+          likesCount: isLiked ? p.likesCount + 1 : p.likesCount - 1 // revert
+        };
+      }));
     }
-    // Para n perder scroll, ideal seria alterar estado local, mas para simplificar
-    // o realtime dispara fetchPosts(0) que já atualiza no topo.
   };
 
   const handleDeletePost = async (postId) => {
@@ -309,12 +332,23 @@ export default function Feed({ session }) {
     if (!content.trim()) return;
 
     try {
-      const { error } = await supabase.from('comments').insert([
-        { post_id: postId, user_id: session.user.id, content: content.trim() }
-      ]);
+      const { data, error } = await supabase.from('comments')
+        .insert([{ post_id: postId, user_id: session.user.id, content: content.trim() }])
+        .select('*, profiles (full_name, avatar_url), comment_likes (user_id)')
+        .single();
 
       if (error) throw error;
-      setPosts(posts.map(p => p.id === postId ? { ...p, newComment: '' } : p));
+
+      // Update locally to show the new comment immediately
+      setPosts(posts.map(p => {
+        if (p.id !== postId) return p;
+        return {
+          ...p,
+          comments: [...(p.comments || []), data],
+          commentsCount: p.commentsCount + 1,
+          newComment: ''
+        };
+      }));
     } catch(err) {
       console.error("Erro ao comentar", err);
     }

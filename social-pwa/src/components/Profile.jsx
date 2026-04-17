@@ -133,15 +133,20 @@ export default function Profile({ session }) {
 
   const handleLike = async (postId, isLiked) => {
     try {
+      // Optimistic update
+      setPosts(posts.map(p => p.id === postId ? { ...p, isLiked: !isLiked, likesCount: isLiked ? p.likesCount - 1 : p.likesCount + 1 } : p));
+
       if (isLiked) {
-        await supabase.from('likes').delete().match({ post_id: postId, user_id: session.user.id });
-        setPosts(posts.map(p => p.id === postId ? { ...p, isLiked: false, likesCount: p.likesCount - 1 } : p));
+        const { error } = await supabase.from('likes').delete().match({ post_id: postId, user_id: session.user.id });
+        if (error) throw error;
       } else {
-        await supabase.from('likes').insert([{ post_id: postId, user_id: session.user.id }]);
-        setPosts(posts.map(p => p.id === postId ? { ...p, isLiked: true, likesCount: p.likesCount + 1 } : p));
+        const { error } = await supabase.from('likes').insert([{ post_id: postId, user_id: session.user.id }]);
+        if (error) throw error;
       }
     } catch (error) {
       console.error(error);
+      // Revert optimistic update
+      setPosts(posts.map(p => p.id === postId ? { ...p, isLiked: isLiked, likesCount: isLiked ? p.likesCount + 1 : p.likesCount - 1 } : p));
     }
   };
 
@@ -156,19 +161,22 @@ export default function Profile({ session }) {
   const handleCommentSubmit = async (postId, content) => {
     if (!content.trim()) return;
     try {
+      // We can't do full optimistic UI for comments easily without the ID,
+      // but we can at least clear the input quickly.
+      setPosts(posts.map(p => p.id === postId ? { ...p, newComment: '' } : p));
+
       const { data, error } = await supabase.from('comments')
         .insert([{ post_id: postId, user_id: session.user.id, content: content.trim() }])
         .select('*, profiles (full_name, avatar_url), comment_likes (user_id)')
         .single();
       if (error) throw error;
 
-      setPosts(posts.map(p => {
+      setPosts(currentPosts => currentPosts.map(p => {
         if (p.id !== postId) return p;
         return {
           ...p,
           comments: [...(p.comments || []), data],
-          commentsCount: p.commentsCount + 1,
-          newComment: ''
+          commentsCount: p.commentsCount + 1
         };
       }));
     } catch (error) {
@@ -178,15 +186,36 @@ export default function Profile({ session }) {
 
   const handleCommentLike = async (postId, commentId, isLiked) => {
     try {
+      // Optimistic update
+      setPosts(posts.map(p => p.id === postId ? {
+        ...p,
+        comments: p.comments.map(c => c.id === commentId ? {
+          ...c,
+          comment_likes: isLiked
+            ? c.comment_likes.filter(l => l.user_id !== session.user.id)
+            : [...(c.comment_likes || []), { user_id: session.user.id }]
+        } : c)
+      } : p));
+
       if (isLiked) {
-        await supabase.from('comment_likes').delete().match({ comment_id: commentId, user_id: session.user.id });
-        setPosts(posts.map(p => p.id === postId ? { ...p, comments: p.comments.map(c => c.id === commentId ? { ...c, comment_likes: c.comment_likes.filter(l => l.user_id !== session.user.id) } : c) } : p));
+        const { error } = await supabase.from('comment_likes').delete().match({ comment_id: commentId, user_id: session.user.id });
+        if (error) throw error;
       } else {
-        await supabase.from('comment_likes').insert([{ comment_id: commentId, user_id: session.user.id }]);
-        setPosts(posts.map(p => p.id === postId ? { ...p, comments: p.comments.map(c => c.id === commentId ? { ...c, comment_likes: [...(c.comment_likes || []), { user_id: session.user.id }] } : c) } : p));
+        const { error } = await supabase.from('comment_likes').insert([{ comment_id: commentId, user_id: session.user.id }]);
+        if (error) throw error;
       }
     } catch (error) {
       console.error(error);
+      // Revert optimistic update
+      setPosts(posts.map(p => p.id === postId ? {
+        ...p,
+        comments: p.comments.map(c => c.id === commentId ? {
+          ...c,
+          comment_likes: isLiked
+            ? [...(c.comment_likes || []), { user_id: session.user.id }]
+            : c.comment_likes.filter(l => l.user_id !== session.user.id)
+        } : c)
+      } : p));
     }
   };
 
