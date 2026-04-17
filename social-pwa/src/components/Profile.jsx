@@ -41,7 +41,7 @@ export default function Profile({ session }) {
         .from('profiles')
         .select('*')
         .eq('id', profileId)
-        .single();
+        .maybeSingle();
 
       if (profileData) {
         setProfile(profileData);
