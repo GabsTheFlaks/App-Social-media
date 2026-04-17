@@ -65,6 +65,7 @@ function App() {
           <Route path="network" element={<Network session={session} />} />
           <Route path="notifications" element={<Notifications />} />
           <Route path="profile" element={<Profile session={session} />} />
+          <Route path="profile/:id" element={<Profile session={session} />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

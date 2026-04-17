@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Heart, MessageCircle, Share2, Image as ImageIcon, Send, Trash2 } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Image as ImageIcon, Send, Trash2, Globe, Users, Repeat2 } from 'lucide-react';
 import clsx from 'clsx';
+import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -17,6 +18,7 @@ export default function Feed({ session }) {
   const [profile, setProfile] = useState(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
+  const [visibility, setVisibility] = useState('public');
 
   const fetchProfile = async () => {
     const { data } = await supabase
@@ -30,18 +32,25 @@ export default function Feed({ session }) {
   const fetchPosts = async () => {
     try {
       // Busca posts com autor e total de likes
-      // Busca posts com autor, curtidas e comentários
+      // Busca posts com autor, curtidas, comentários e repost original
       const { data: postsData, error: postsError } = await supabase
         .from('posts')
         .select(`
           *,
-          profiles ( full_name, role, avatar_url ),
+          profiles!posts_user_id_fkey ( full_name, role, avatar_url ),
           likes ( user_id ),
           comments (
             id,
             content,
             created_at,
             profiles ( full_name, avatar_url )
+          ),
+          original_post:repost_id (
+            id,
+            content,
+            image_url,
+            created_at,
+            profiles!posts_user_id_fkey ( id, full_name, avatar_url )
           )
         `)
         .order('created_at', { ascending: false });
@@ -60,6 +69,8 @@ export default function Feed({ session }) {
           avatar: post.profiles?.avatar_url,
           likes_count: post.likes.length,
           liked_by_me: post.likes.some(like => like.user_id === session.user.id),
+          is_repost: !!post.repost_id,
+          original: post.original_post,
           comments: sortedComments.map(c => ({
             id: c.id,
             content: c.content,
@@ -131,9 +142,18 @@ export default function Feed({ session }) {
         imageUrl = await handleImageUpload(selectedImage);
       }
 
+      // Se não houver texto, passamos uma string vazia para não quebrar a restrição "not null"
+      // ou atualizamos o banco para permitir. Vamos passar string vazia por segurança.
+      const contentToSave = newPost.trim() ? newPost : ' ';
+
       const { error } = await supabase
         .from('posts')
-        .insert([{ user_id: session.user.id, content: newPost, image_url: imageUrl }]);
+        .insert([{
+          user_id: session.user.id,
+          content: contentToSave,
+          image_url: imageUrl,
+          visibility: visibility
+        }]);
 
       if (error) throw error;
       setNewPost('');
@@ -193,6 +213,26 @@ export default function Feed({ session }) {
   const [activeCommentPost, setActiveCommentPost] = useState(null);
   const [commentText, setCommentText] = useState('');
   const [commenting, setCommenting] = useState(false);
+
+  const handleRepost = async (postId) => {
+    if(!window.confirm("Deseja repostar esta publicação no seu perfil?")) return;
+    try {
+      const { error } = await supabase
+        .from('posts')
+        .insert([{
+          user_id: session.user.id,
+          content: ' ',
+          repost_id: postId,
+          visibility: 'public' // Ou o mesmo do original
+        }]);
+
+      if (error) throw error;
+      alert("Publicação repostada com sucesso!");
+    } catch(err) {
+      console.error(err);
+      alert("Erro ao repostar.");
+    }
+  }
 
   const handleComment = async (e, postId) => {
     e.preventDefault();
@@ -274,18 +314,34 @@ export default function Feed({ session }) {
           )}
 
           <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-100">
-            <label className="text-gray-500 hover:text-primary-600 cursor-pointer flex items-center gap-2 p-2 rounded-lg hover:bg-primary-50 transition-colors">
-              <ImageIcon className="w-5 h-5" />
-              <span className="text-sm font-medium hidden sm:inline">Mídia</span>
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  if(e.target.files && e.target.files[0]) setSelectedImage(e.target.files[0])
-                }}
-              />
-            </label>
+            <div className="flex items-center gap-2">
+              <label className="text-gray-500 hover:text-primary-600 cursor-pointer flex items-center gap-2 p-2 rounded-lg hover:bg-primary-50 transition-colors">
+                <ImageIcon className="w-5 h-5" />
+                <span className="text-sm font-medium hidden sm:inline">Mídia</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    if(e.target.files && e.target.files[0]) setSelectedImage(e.target.files[0])
+                  }}
+                />
+              </label>
+
+              <div className="relative group">
+                <button
+                  type="button"
+                  className="text-gray-500 hover:text-primary-600 flex items-center gap-2 p-2 rounded-lg hover:bg-primary-50 transition-colors"
+                  onClick={() => setVisibility(v => v === 'public' ? 'connections' : 'public')}
+                >
+                  {visibility === 'public' ? <Globe className="w-4 h-4" /> : <Users className="w-4 h-4" />}
+                  <span className="text-sm font-medium hidden sm:inline">
+                    {visibility === 'public' ? 'Público' : 'Conexões'}
+                  </span>
+                </button>
+              </div>
+            </div>
+
             <button
               type="submit"
               disabled={(!newPost.trim() && !selectedImage) || posting || uploadingImage}
@@ -324,26 +380,60 @@ export default function Feed({ session }) {
         ) : (
           posts.map(post => (
             <article key={post.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+              {post.is_repost && (
+                <div className="flex items-center gap-2 text-xs text-gray-500 font-medium mb-3 pb-2 border-b border-gray-50">
+                  <Repeat2 className="w-4 h-4" />
+                  <span>{post.author} repostou</span>
+                  {post.user_id === session.user.id && (
+                    <button onClick={() => deletePost(post.id)} className="ml-auto text-gray-400 hover:text-red-500">
+                      Excluir
+                    </button>
+                  )}
+                </div>
+              )}
+
               <div className="flex justify-between items-start mb-3">
                 <div className="flex items-start gap-3">
-                  <img src={post.avatar} alt={post.author} className="w-12 h-12 rounded-full" />
+                  <Link to={`/profile/${post.is_repost ? post.original?.profiles?.id : post.user_id}`}>
+                    <img
+                      src={post.is_repost ? post.original?.profiles?.avatar_url : post.avatar}
+                      alt={post.is_repost ? post.original?.profiles?.full_name : post.author}
+                      className="w-12 h-12 rounded-full hover:ring-2 ring-primary-500 transition-all"
+                    />
+                  </Link>
                   <div>
-                    <h3 className="font-semibold text-gray-900">{post.author}</h3>
-                    <p className="text-xs text-gray-500">{post.role}</p>
-                    <span className="text-xs text-gray-400 capitalize">{dayjs(post.created_at).fromNow()}</span>
+                    <Link to={`/profile/${post.is_repost ? post.original?.profiles?.id : post.user_id}`} className="hover:underline">
+                      <h3 className="font-semibold text-gray-900">
+                        {post.is_repost ? post.original?.profiles?.full_name : post.author}
+                      </h3>
+                    </Link>
+                    {!post.is_repost && <p className="text-xs text-gray-500">{post.role}</p>}
+                    <div className="flex items-center gap-1 text-xs text-gray-400 capitalize mt-0.5">
+                      <span>{dayjs(post.is_repost ? post.original?.created_at : post.created_at).fromNow()}</span>
+                      <span>•</span>
+                      {post.visibility === 'public' ? <Globe className="w-3 h-3" /> : <Users className="w-3 h-3" />}
+                    </div>
                   </div>
                 </div>
-                {post.user_id === session.user.id && (
+                {!post.is_repost && post.user_id === session.user.id && (
                   <button onClick={() => deletePost(post.id)} className="text-gray-400 hover:text-red-500 p-1">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 )}
               </div>
-              <p className="text-gray-800 mb-4 whitespace-pre-wrap">{post.content}</p>
 
-              {post.image_url && (
+              {/* Conteúdo do post (original ou do próprio post se não for repost) */}
+              <p className="text-gray-800 mb-4 whitespace-pre-wrap">
+                {post.is_repost ? post.original?.content : post.content}
+              </p>
+
+              {((post.is_repost ? post.original?.image_url : post.image_url)) && (
                 <div className="mb-4 rounded-xl overflow-hidden bg-gray-100">
-                  <img src={post.image_url} alt="Post image" className="w-full object-contain max-h-96" />
+                  <img
+                    src={post.is_repost ? post.original?.image_url : post.image_url}
+                    alt="Post image"
+                    className="w-full object-contain max-h-96"
+                  />
                 </div>
               )}
 
@@ -373,9 +463,12 @@ export default function Feed({ session }) {
                   <MessageCircle className="w-5 h-5" />
                   <span className="font-medium text-sm hidden sm:inline">Comentar</span>
                 </button>
-                <button className="flex-1 flex justify-center items-center gap-2 py-2 text-gray-400 cursor-not-allowed rounded-lg transition-colors">
-                  <Share2 className="w-5 h-5" />
-                  <span className="font-medium text-sm hidden sm:inline">Compartilhar</span>
+                <button
+                  onClick={() => handleRepost(post.is_repost ? post.repost_id : post.id)}
+                  className="flex-1 flex justify-center items-center gap-2 py-2 text-gray-500 hover:bg-gray-50 rounded-lg transition-colors"
+                >
+                  <Repeat2 className="w-5 h-5" />
+                  <span className="font-medium text-sm hidden sm:inline">Repostar</span>
                 </button>
               </div>
 
