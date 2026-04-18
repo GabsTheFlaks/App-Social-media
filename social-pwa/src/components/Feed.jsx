@@ -162,13 +162,13 @@ export default function Feed({ session }) {
 
     try {
       const { error: uploadError } = await supabase.storage
-        .from('posts-images')
+        .from('post_images')
         .upload(filePath, file);
 
       if (uploadError) throw uploadError;
 
       const { data: publicUrlData } = supabase.storage
-        .from('posts-images')
+        .from('post_images')
         .getPublicUrl(filePath);
 
       return publicUrlData.publicUrl;
