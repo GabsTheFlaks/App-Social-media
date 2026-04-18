@@ -37,11 +37,19 @@ export default function Profile({ session }) {
     try {
       setLoading(true);
       // Pega perfil
-      const { data: profileData } = await supabase
+      const { data: profilesData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', profileId)
-        .maybeSingle();
+        .limit(1);
+
+      const profileData = profilesData && profilesData.length > 0 ? profilesData[0] : null;
+
+      console.log('Profile Fetch Data:', profileData, 'Error:', profileError, 'ProfileId:', profileId);
+
+      if (profileError) {
+        console.error('Error fetching profile:', profileError);
+      }
 
       if (profileData) {
         setProfile(profileData);

@@ -37,8 +37,8 @@ export default function Feed({ session }) {
       .from('profiles')
       .select('*')
       .eq('id', session.user.id)
-      .maybeSingle();
-    if (data) setProfile(data);
+      .limit(1);
+    if (data && data.length > 0) setProfile(data[0]);
   };
 
   const fetchPosts = async (offset = 0) => {
