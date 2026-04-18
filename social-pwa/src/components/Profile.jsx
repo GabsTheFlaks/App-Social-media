@@ -37,11 +37,19 @@ export default function Profile({ session }) {
     try {
       setLoading(true);
       // Pega perfil
-      const { data: profileData } = await supabase
+      const { data: profilesData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', profileId)
-        .single();
+        .limit(1);
+
+      const profileData = profilesData && profilesData.length > 0 ? profilesData[0] : null;
+
+      console.log('Profile Fetch Data:', profileData, 'Error:', profileError, 'ProfileId:', profileId);
+
+      if (profileError) {
+        console.error('Error fetching profile:', profileError);
+      }
 
       if (profileData) {
         setProfile(profileData);
@@ -84,7 +92,7 @@ export default function Profile({ session }) {
           profiles (full_name, avatar_url, role),
           likes (user_id),
           comments (*, profiles (full_name, avatar_url), comment_likes (user_id)),
-          original:original_post_id (
+          original:posts!original_post_id (
             id, content, image_url, created_at,
             profiles (full_name, avatar_url)
           )
