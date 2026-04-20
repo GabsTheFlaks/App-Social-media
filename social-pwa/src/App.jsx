@@ -9,6 +9,8 @@ import NetworkLayout from './components/NetworkLayout';
 import Login from './components/Login';
 import Notifications from './components/Notifications';
 import Settings from './components/Settings';
+import SinglePost from './components/SinglePost';
+import ChatRoute from './components/ChatRoute';
 
 function App() {
   const [session, setSession] = useState(null);
@@ -61,6 +63,8 @@ function App() {
           <Route path="profile" element={<Profile session={session} />} />
           <Route path="profile/:id" element={<Profile session={session} />} />
           <Route path="settings" element={<Settings session={session} />} />
+          <Route path="post/:id" element={<SinglePost session={session} />} />
+          <Route path="chat/:id" element={<ChatRoute session={session} />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

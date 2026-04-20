@@ -1,14 +1,14 @@
-import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Network from './Network';
-import Chat from './Chat';
 
-// Componente Wrapper para gerenciar se mostra a lista de amigos ou a tela de chat
+// Componente Wrapper refatorado para usar as rotas reais do React Router
 export default function NetworkLayout({ session }) {
-  const [activeChatUser, setActiveChatUser] = useState(null);
+  const navigate = useNavigate();
 
-  if (activeChatUser) {
-    return <Chat session={session} selectedUser={activeChatUser} onBack={() => setActiveChatUser(null)} />;
-  }
+  // Ao clicar em abrir chat, redireciona para a Rota de Chat
+  const handleOpenChat = (user) => {
+    navigate(`/chat/${user.id}`);
+  };
 
-  return <Network session={session} onOpenChat={setActiveChatUser} />;
+  return <Network session={session} onOpenChat={handleOpenChat} />;
 }

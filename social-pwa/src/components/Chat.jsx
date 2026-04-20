@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
+import { compressImage } from '../lib/imageUtils';
 import { Send, ArrowLeft, Loader2, MessageSquare, Image as ImageIcon, X } from 'lucide-react';
 import dayjs from 'dayjs';
 
@@ -129,14 +130,15 @@ export default function Chat({ session, onBack, selectedUser }) {
 
       setUploadingImage(true);
       const file = e.target.files[0];
-      const fileExt = file.name.split('.').pop();
+      const compressedFile = await compressImage(file);
+      const fileExt = compressedFile.name.split('.').pop();
       const fileName = `${session.user.id}-${Math.random()}.${fileExt}`;
       const filePath = `chat/${fileName}`;
 
       // Upload no Storage
       const { error: uploadError } = await supabase.storage
         .from('post_images')
-        .upload(filePath, file);
+        .upload(filePath, compressedFile);
 
       if (uploadError) throw uploadError;
 
