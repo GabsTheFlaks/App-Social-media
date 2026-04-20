@@ -3,6 +3,7 @@ import { Outlet, NavLink } from 'react-router-dom';
 import { Home, Users, Bell, User, LogOut } from 'lucide-react';
 import clsx from 'clsx';
 import { supabase } from '../lib/supabase';
+import OfflineBanner from './OfflineBanner';
 
 export default function Layout({ session }) {
   const [unreadCount, setUnreadCount] = useState(0);
@@ -53,7 +54,8 @@ export default function Layout({ session }) {
   ];
 
   return (
-    <div className="flex h-screen bg-gray-50 flex-col md:flex-row overflow-hidden">
+    <div className="flex h-screen bg-gray-50 flex-col md:flex-row overflow-hidden pt-0 relative">
+      <OfflineBanner />
       {/* Sidebar for Desktop */}
       <aside className="hidden md:flex flex-col w-64 bg-white border-r border-gray-200">
         <div className="p-4 border-b border-gray-200">

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { UserPlus, Check, X, Clock, UserCheck, Search, MessageSquare } from 'lucide-react';
+import { UserPlus, Check, X, Clock, UserCheck, Search, MessageSquare, UserMinus } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 export default function Network({ session, onOpenChat }) {
@@ -69,6 +69,21 @@ export default function Network({ session, onOpenChat }) {
       const { error } = await supabase
         .from('connections')
         .update({ status: 'accepted' })
+        .eq('id', connectionId);
+
+      if (error) throw error;
+      fetchData();
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleDisconnect = async (connectionId) => {
+    if (!window.confirm("Deseja realmente desfazer essa conexão?")) return;
+    try {
+      const { error } = await supabase
+        .from('connections')
+        .delete()
         .eq('id', connectionId);
 
       if (error) throw error;
@@ -213,13 +228,22 @@ export default function Network({ session, onOpenChat }) {
                 )}
 
                 {status === 'accepted' && (
-                  <button
-                    onClick={() => onOpenChat(user)}
-                    className="w-full flex items-center justify-center gap-2 py-1.5 bg-primary-100 text-primary-700 hover:bg-primary-200 transition-colors rounded-full font-medium text-sm"
-                  >
-                    <MessageSquare className="w-4 h-4" />
-                    Mensagem
-                  </button>
+                  <div className="w-full flex gap-2">
+                    <button
+                      onClick={() => onOpenChat(user)}
+                      className="flex-1 flex items-center justify-center gap-2 py-1.5 bg-primary-100 text-primary-700 hover:bg-primary-200 transition-colors rounded-full font-medium text-sm"
+                    >
+                      <MessageSquare className="w-4 h-4" />
+                      Mensagem
+                    </button>
+                    <button
+                      onClick={() => handleDisconnect(conn.id)}
+                      className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                      title="Desfazer conexão"
+                    >
+                      <UserMinus className="w-4 h-4" />
+                    </button>
+                  </div>
                 )}
 
                 {status === 'pending_received' && (

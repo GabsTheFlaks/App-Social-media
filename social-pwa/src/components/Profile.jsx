@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Camera, MapPin, Briefcase, Mail, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { Settings } from 'lucide-react';
 import Post from './Post';
 import EmptyState from './EmptyState';
 
 export default function Profile({ session }) {
   const { id: routeId } = useParams();
+  const navigate = useNavigate();
 
   // Se existir id na rota, vemos o perfil da pessoa, senão, o nosso.
   const profileId = routeId || session.user.id;
@@ -219,6 +221,47 @@ export default function Profile({ session }) {
     }
   };
 
+  const handleCommentEdit = async (postId, commentId, newContent) => {
+    if (!newContent.trim()) return;
+    try {
+      setPosts(posts.map(p => p.id === postId ? {
+        ...p,
+        comments: p.comments.map(c => c.id === commentId ? { ...c, content: newContent } : c)
+      } : p));
+
+      const { error } = await supabase
+        .from('comments')
+        .update({ content: newContent })
+        .eq('id', commentId)
+        .eq('user_id', session.user.id);
+
+      if (error) throw error;
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleCommentDelete = async (postId, commentId) => {
+    if (!window.confirm("Deseja realmente apagar este comentário?")) return;
+    try {
+      setPosts(posts.map(p => p.id === postId ? {
+        ...p,
+        comments: p.comments.filter(c => c.id !== commentId),
+        commentsCount: p.commentsCount - 1
+      } : p));
+
+      const { error } = await supabase
+        .from('comments')
+        .delete()
+        .eq('id', commentId)
+        .eq('user_id', session.user.id);
+
+      if (error) throw error;
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const handleRepost = async (postToRepost) => {
     if (!confirm('Deseja compartilhar esta publicação?')) return;
     try {
@@ -387,21 +430,30 @@ export default function Profile({ session }) {
             </div>
 
             {isMyProfile && (
-              !editing ? (
+              <div className="flex items-center gap-2">
+                {!editing ? (
+                  <button
+                    onClick={() => setEditing(true)}
+                    className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-2 rounded-full font-medium text-sm transition-colors"
+                  >
+                    Editar Perfil
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setEditing(false)}
+                    className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-6 py-2 rounded-full font-medium text-sm transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                )}
                 <button
-                  onClick={() => setEditing(true)}
-                  className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-2 rounded-full font-medium text-sm transition-colors"
+                  onClick={() => navigate('/settings')}
+                  className="p-2 text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors"
+                  title="Configurações"
                 >
-                  Editar Perfil
+                  <Settings className="w-5 h-5" />
                 </button>
-              ) : (
-                <button
-                  onClick={() => setEditing(false)}
-                  className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-6 py-2 rounded-full font-medium text-sm transition-colors"
-                >
-                  Cancelar
-                </button>
-              )
+              </div>
             )}
           </div>
 
@@ -521,6 +573,8 @@ export default function Profile({ session }) {
                   onRepost={handleRepost}
                   onImageClick={setLightboxImage}
                   onCommentLike={handleCommentLike}
+                  onCommentEdit={handleCommentEdit}
+                  onCommentDelete={handleCommentDelete}
                 />
               ))}
             </div>

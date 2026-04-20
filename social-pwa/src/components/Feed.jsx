@@ -354,6 +354,49 @@ export default function Feed({ session }) {
     }
   };
 
+  const handleCommentEdit = async (postId, commentId, newContent) => {
+    if (!newContent.trim()) return;
+    try {
+      // Optimistic update
+      setPosts(posts.map(p => p.id === postId ? {
+        ...p,
+        comments: p.comments.map(c => c.id === commentId ? { ...c, content: newContent } : c)
+      } : p));
+
+      const { error } = await supabase
+        .from('comments')
+        .update({ content: newContent })
+        .eq('id', commentId)
+        .eq('user_id', session.user.id);
+
+      if (error) throw error;
+    } catch (err) {
+      console.error("Erro ao editar comentário", err);
+    }
+  };
+
+  const handleCommentDelete = async (postId, commentId) => {
+    if (!window.confirm("Deseja realmente apagar este comentário?")) return;
+    try {
+      // Optimistic update
+      setPosts(posts.map(p => p.id === postId ? {
+        ...p,
+        comments: p.comments.filter(c => c.id !== commentId),
+        commentsCount: p.commentsCount - 1
+      } : p));
+
+      const { error } = await supabase
+        .from('comments')
+        .delete()
+        .eq('id', commentId)
+        .eq('user_id', session.user.id);
+
+      if (error) throw error;
+    } catch (err) {
+      console.error("Erro ao apagar comentário", err);
+    }
+  };
+
   const handleRepost = async (post) => {
     if(!window.confirm("Deseja repostar esta publicação no seu perfil?")) return;
 
@@ -495,6 +538,8 @@ export default function Feed({ session }) {
                   onRepost={handleRepost}
                   onImageClick={setLightboxImage}
                   onCommentLike={handleCommentLike}
+                  onCommentEdit={handleCommentEdit}
+                  onCommentDelete={handleCommentDelete}
                 />
               </div>
             );
