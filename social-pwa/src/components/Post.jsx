@@ -1,8 +1,9 @@
-import React from 'react';
-import { Heart, MessageCircle, Share2, Send, Trash2, Globe, Users, Repeat2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Heart, MessageCircle, Share2, Send, Trash2, Globe, Users, Repeat2, Edit2, Check, X } from 'lucide-react';
 import clsx from 'clsx';
 import { Link } from 'react-router-dom';
 import dayjs from 'dayjs';
+import LinkPreview from './LinkPreview';
 
 export default function Post({
   post,
@@ -15,8 +16,39 @@ export default function Post({
   onCommentSubmit,
   onRepost,
   onImageClick,
-  onCommentLike
+  onCommentLike,
+  onCommentDelete,
+  onCommentEdit
 }) {
+  const [editingCommentId, setEditingCommentId] = useState(null);
+  const [editCommentText, setEditCommentText] = useState('');
+
+  const startEditComment = (comment) => {
+    setEditingCommentId(comment.id);
+    setEditCommentText(comment.content);
+  };
+
+  const cancelEditComment = () => {
+    setEditingCommentId(null);
+    setEditCommentText('');
+  };
+
+  const submitEditComment = () => {
+    if (!editCommentText.trim()) return;
+    onCommentEdit(post.id, editingCommentId, editCommentText.trim());
+    cancelEditComment();
+  };
+
+  // Detecta URLs no texto
+  const extractUrls = (text) => {
+    if (!text) return [];
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    return text.match(urlRegex) || [];
+  };
+
+  const urls = extractUrls(post.is_repost ? post.original?.content : post.content);
+  const firstUrl = urls.length > 0 ? urls[0] : null;
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 transition-all">
       {post.is_repost && (
@@ -59,6 +91,11 @@ export default function Post({
         <p className="text-gray-800 text-sm md:text-base whitespace-pre-wrap leading-relaxed">
           {post.is_repost ? post.original?.content : post.content}
         </p>
+
+        {/* Se nao tem imagem mas tem link, mostra o preview do link */}
+        {!post.image_url && (!post.is_repost || !post.original?.image_url) && firstUrl && (
+           <LinkPreview url={firstUrl} />
+        )}
       </div>
 
       {(post.image_url || (post.is_repost && post.original?.image_url)) && (
@@ -147,12 +184,41 @@ export default function Post({
 
               return (
                 <div key={comment.id} className="flex gap-2">
-                  <img src={comment.profiles?.avatar_url} alt="User" className="w-7 h-7 rounded-full object-cover" />
-                  <div className="flex flex-col">
-                    <div className="bg-gray-100 rounded-2xl rounded-tl-none px-3 py-2 text-sm">
+                  <img src={comment.profiles?.avatar_url} alt="User" className="w-7 h-7 rounded-full object-cover mt-1" />
+                  <div className="flex flex-col flex-1">
+                    <div className="bg-gray-100 rounded-2xl rounded-tl-none px-3 py-2 text-sm relative group">
                       <span className="font-bold text-gray-900 block">{comment.profiles?.full_name}</span>
-                      <span className="text-gray-800">{comment.content}</span>
+
+                      {editingCommentId === comment.id ? (
+                        <div className="flex items-center gap-2 mt-1">
+                          <input
+                            type="text"
+                            className="flex-1 bg-white border border-gray-300 rounded px-2 py-1 text-xs"
+                            value={editCommentText}
+                            onChange={(e) => setEditCommentText(e.target.value)}
+                            onKeyPress={(e) => e.key === 'Enter' && submitEditComment()}
+                            autoFocus
+                          />
+                          <button onClick={submitEditComment} className="text-green-600"><Check className="w-4 h-4"/></button>
+                          <button onClick={cancelEditComment} className="text-red-500"><X className="w-4 h-4"/></button>
+                        </div>
+                      ) : (
+                        <span className="text-gray-800">{comment.content}</span>
+                      )}
+
+                      {/* Comment Actions for Author */}
+                      {comment.user_id === session.user.id && editingCommentId !== comment.id && (
+                        <div className="absolute right-2 top-2 hidden group-hover:flex items-center gap-2 bg-gray-100/90 px-1 rounded">
+                          <button onClick={() => startEditComment(comment)} className="text-gray-400 hover:text-blue-500" title="Editar">
+                            <Edit2 className="w-3 h-3" />
+                          </button>
+                          <button onClick={() => onCommentDelete(post.id, comment.id)} className="text-gray-400 hover:text-red-500" title="Excluir">
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
                     </div>
+
                     <div className="flex items-center gap-3 mt-1 ml-2 text-xs text-gray-500 font-medium">
                       <button
                         onClick={() => onCommentLike(post.id, comment.id, isCommentLiked)}
