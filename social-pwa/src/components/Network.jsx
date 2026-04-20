@@ -230,7 +230,10 @@ export default function Network({ session, onOpenChat }) {
                 {status === 'accepted' && (
                   <div className="w-full flex gap-2">
                     <button
-                      onClick={() => onOpenChat(user)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenChat(user);
+                      }}
                       className="flex-1 flex items-center justify-center gap-2 py-1.5 bg-primary-100 text-primary-700 hover:bg-primary-200 transition-colors rounded-full font-medium text-sm"
                     >
                       <MessageSquare className="w-4 h-4" />

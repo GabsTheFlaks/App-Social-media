@@ -6,6 +6,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Settings } from 'lucide-react';
 import Post from './Post';
 import EmptyState from './EmptyState';
+import { useOnlineUsers } from './OnlinePresence';
 
 export default function Profile({ session }) {
   const { id: routeId } = useParams();
@@ -18,6 +19,8 @@ export default function Profile({ session }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
+  const onlineUsers = useOnlineUsers(session);
+  const isOnline = onlineUsers.has(profileId);
 
   // Stats & Connections
   const [stats, setStats] = useState({ connections: 0, posts: 0 });
@@ -141,6 +144,22 @@ export default function Profile({ session }) {
       setStats(prev => ({ ...prev, posts: prev.posts > 0 ? prev.posts - 1 : 0 }));
     } catch (error) {
       console.error(error);
+    }
+  };
+
+  const handleEditPost = async (postId, newContent) => {
+    if (!newContent.trim()) return;
+    try {
+      setPosts(currentPosts => currentPosts.map(p => p.id === postId ? { ...p, content: newContent } : p));
+      const { error } = await supabase
+        .from('posts')
+        .update({ content: newContent })
+        .eq('id', postId)
+        .eq('user_id', session.user.id);
+      if (error) throw error;
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao editar post.");
     }
   };
 
@@ -428,8 +447,11 @@ export default function Profile({ session }) {
                 alt={profile.full_name}
                 className={`w-24 h-24 md:w-32 md:h-32 rounded-full border-4 border-white bg-white object-cover ${uploadingAvatar ? 'opacity-50' : ''}`}
               />
+              {isOnline && !isMyProfile && (
+                <div className="absolute bottom-2 right-2 w-5 h-5 bg-green-500 rounded-full border-4 border-white" title="Online agora"></div>
+              )}
               {isMyProfile && (
-                <label className="absolute bottom-0 right-0 bg-primary-600 text-white p-2 rounded-full cursor-pointer hover:bg-primary-700 transition shadow-md">
+                <label className="absolute bottom-0 right-0 bg-primary-600 text-white p-2 rounded-full cursor-pointer hover:bg-primary-700 transition shadow-md z-10">
                   <Camera className="w-4 h-4" />
                   <input
                     type="file"
@@ -601,6 +623,7 @@ export default function Profile({ session }) {
                   onCommentLike={handleCommentLike}
                   onCommentEdit={handleCommentEdit}
                   onCommentDelete={handleCommentDelete}
+                  onEdit={handleEditPost}
                 />
               ))}
             </div>

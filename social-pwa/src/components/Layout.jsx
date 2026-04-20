@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
-import { Home, Users, Bell, User, LogOut } from 'lucide-react';
+import { Home, Users, MessageCircle, Bell, User, LogOut } from 'lucide-react';
 import clsx from 'clsx';
 import { supabase } from '../lib/supabase';
 import OfflineBanner from './OfflineBanner';
@@ -77,7 +77,8 @@ export default function Layout({ session }) {
 
   const navItems = [
     { path: '/', icon: Home, label: 'Home' },
-    { path: '/network', icon: Users, label: 'Rede', badge: unreadMessages },
+    { path: '/network', icon: Users, label: 'Rede' },
+    { path: '/messages', icon: MessageCircle, label: 'Mensagens', badge: unreadMessages },
     { path: '/notifications', icon: Bell, label: 'Notificações', badge: unreadCount },
     { path: '/profile', icon: User, label: 'Perfil' },
   ];

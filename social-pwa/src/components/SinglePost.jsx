@@ -126,6 +126,14 @@ export default function SinglePost({ session }) {
     } catch (error) { console.error(error); }
   };
 
+  const handleEditPost = async (postId, newContent) => {
+    if (!newContent.trim()) return;
+    try {
+      setPost(p => ({ ...p, content: newContent }));
+      await supabase.from('posts').update({ content: newContent }).eq('id', postId).eq('user_id', session.user.id);
+    } catch (err) { console.error(err); }
+  };
+
   const handleRepost = async (postToRepost) => {
     if (!window.confirm('Deseja compartilhar esta publicação?')) return;
     try {
@@ -159,6 +167,7 @@ export default function SinglePost({ session }) {
         onCommentLike={handleCommentLike}
         onCommentEdit={handleCommentEdit}
         onCommentDelete={handleCommentDelete}
+        onEdit={handleEditPost}
       />
 
       {lightboxImage && (

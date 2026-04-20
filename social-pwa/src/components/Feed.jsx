@@ -326,6 +326,25 @@ export default function Feed({ session }) {
     }
   };
 
+  const handleEditPost = async (postId, newContent) => {
+    if (!newContent.trim()) return;
+    try {
+      // Optimistic Update
+      setPosts(currentPosts => currentPosts.map(p => p.id === postId ? { ...p, content: newContent } : p));
+
+      const { error } = await supabase
+        .from('posts')
+        .update({ content: newContent })
+        .eq('id', postId)
+        .eq('user_id', session.user.id);
+
+      if (error) throw error;
+    } catch (err) {
+      console.error("Erro ao editar post", err);
+      alert("Erro ao editar post.");
+    }
+  };
+
   const handleCommentChange = (postId, text) => {
     setPosts(posts.map(p => p.id === postId ? { ...p, newComment: text } : p));
   };
@@ -542,6 +561,7 @@ export default function Feed({ session }) {
                   onCommentLike={handleCommentLike}
                   onCommentEdit={handleCommentEdit}
                   onCommentDelete={handleCommentDelete}
+                  onEdit={handleEditPost}
                 />
               </div>
             );
