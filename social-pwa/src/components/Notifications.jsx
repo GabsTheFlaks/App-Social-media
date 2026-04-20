@@ -109,7 +109,9 @@ export default function Notifications({ session }) {
           notifications.map((notif) => {
             let linkTo = '#';
 
-            if (notif.type === 'message' || notif.type === 'connection_request' || notif.type === 'connection_accepted') {
+            if (notif.type === 'message') {
+              linkTo = `/chat/${notif.actor_id}`;
+            } else if (notif.type === 'connection_request' || notif.type === 'connection_accepted') {
               linkTo = '/network';
             } else if (notif.post_id) {
               linkTo = `/post/${notif.post_id}`;
