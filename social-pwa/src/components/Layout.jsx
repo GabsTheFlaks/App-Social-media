@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
 import { Home, Users, Bell, User, LogOut } from 'lucide-react';
 import clsx from 'clsx';
@@ -7,6 +7,21 @@ import OfflineBanner from './OfflineBanner';
 
 export default function Layout({ session }) {
   const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadMessages, setUnreadMessages] = useState(0);
+  const [showBottomNav, setShowBottomNav] = useState(true);
+  const lastScrollY = useRef(0);
+
+  const handleScroll = (e) => {
+    const currentScrollY = e.target.scrollTop;
+    if (currentScrollY > lastScrollY.current && currentScrollY > 50) {
+      // Scrolling down
+      setShowBottomNav(false);
+    } else {
+      // Scrolling up
+      setShowBottomNav(true);
+    }
+    lastScrollY.current = currentScrollY;
+  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -15,7 +30,7 @@ export default function Layout({ session }) {
   useEffect(() => {
     let isMounted = true;
 
-    const fetchUnread = async () => {
+    const fetchUnreadNotifications = async () => {
       if (!session?.user?.id) return;
       const { count } = await supabase
         .from('notifications')
@@ -26,29 +41,43 @@ export default function Layout({ session }) {
       if (isMounted) setUnreadCount(count || 0);
     };
 
-    fetchUnread();
+    const fetchUnreadMessages = async () => {
+      if (!session?.user?.id) return;
+      const { count } = await supabase
+        .from('messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('receiver_id', session.user.id)
+        .eq('read', false);
 
-    const channelId = `layout-notifications-${session?.user?.id}`;
-    let channel = supabase.getChannels().find(c => c.topic === `realtime:${channelId}`);
+      if (isMounted) setUnreadMessages(count || 0);
+    };
 
-    if (!channel) {
-      channel = supabase.channel(channelId);
-      channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${session?.user?.id}` }, fetchUnread)
-             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'notifications', filter: `user_id=eq.${session?.user?.id}` }, fetchUnread);
-      channel.subscribe();
+    fetchUnreadNotifications();
+    fetchUnreadMessages();
+
+    const notifChannelId = `layout-notifications-${session?.user?.id}`;
+    let notifChannel = supabase.getChannels().find(c => c.topic === `realtime:${notifChannelId}`);
+
+    if (!notifChannel) {
+      notifChannel = supabase.channel(notifChannelId);
+      notifChannel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${session?.user?.id}` }, fetchUnreadNotifications)
+             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'notifications', filter: `user_id=eq.${session?.user?.id}` }, fetchUnreadNotifications)
+             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${session?.user?.id}` }, fetchUnreadMessages)
+             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: `receiver_id=eq.${session?.user?.id}` }, fetchUnreadMessages);
+      notifChannel.subscribe();
     }
 
     return () => {
       isMounted = false;
-      if (channel) {
-        supabase.removeChannel(channel);
+      if (notifChannel) {
+        supabase.removeChannel(notifChannel);
       }
     };
   }, [session?.user?.id]);
 
   const navItems = [
     { path: '/', icon: Home, label: 'Home' },
-    { path: '/network', icon: Users, label: 'Rede' },
+    { path: '/network', icon: Users, label: 'Rede', badge: unreadMessages },
     { path: '/notifications', icon: Bell, label: 'Notificações', badge: unreadCount },
     { path: '/profile', icon: User, label: 'Perfil' },
   ];
@@ -101,7 +130,7 @@ export default function Layout({ session }) {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto w-full pb-16 md:pb-0">
+      <main onScroll={handleScroll} className="flex-1 overflow-y-auto w-full pb-16 md:pb-0 transition-all">
         {/* Mobile Header */}
         <header className="md:hidden bg-white border-b border-gray-200 p-4 sticky top-0 z-10 flex justify-between items-center">
           <h1 className="text-xl font-bold text-primary-600">SocialPWA</h1>
@@ -116,7 +145,10 @@ export default function Layout({ session }) {
       </main>
 
       {/* Bottom Tab Bar for Mobile */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around p-2 pb-safe z-20">
+      <nav className={clsx(
+        "md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around p-2 pb-safe z-20 transition-transform duration-300",
+        !showBottomNav && "translate-y-full"
+      )}>
         {navItems.map((item) => (
           <NavLink
             key={item.path}

@@ -3,6 +3,7 @@ import { Heart, MessageCircle, Share2, Send, Trash2, Globe, Users, Repeat2, Edit
 import clsx from 'clsx';
 import { Link } from 'react-router-dom';
 import dayjs from 'dayjs';
+import LinkPreview from './LinkPreview';
 
 export default function Post({
   post,
@@ -37,6 +38,16 @@ export default function Post({
     onCommentEdit(post.id, editingCommentId, editCommentText.trim());
     cancelEditComment();
   };
+
+  // Detecta URLs no texto
+  const extractUrls = (text) => {
+    if (!text) return [];
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    return text.match(urlRegex) || [];
+  };
+
+  const urls = extractUrls(post.is_repost ? post.original?.content : post.content);
+  const firstUrl = urls.length > 0 ? urls[0] : null;
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 transition-all">
@@ -80,6 +91,11 @@ export default function Post({
         <p className="text-gray-800 text-sm md:text-base whitespace-pre-wrap leading-relaxed">
           {post.is_repost ? post.original?.content : post.content}
         </p>
+
+        {/* Se nao tem imagem mas tem link, mostra o preview do link */}
+        {!post.image_url && (!post.is_repost || !post.original?.image_url) && firstUrl && (
+           <LinkPreview url={firstUrl} />
+        )}
       </div>
 
       {(post.image_url || (post.is_repost && post.original?.image_url)) && (
