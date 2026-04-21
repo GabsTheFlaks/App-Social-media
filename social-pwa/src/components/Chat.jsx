@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { compressImage } from '../lib/imageUtils';
-import { Send, ArrowLeft, Loader2, MessageSquare, Image as ImageIcon, X } from 'lucide-react';
+import { Send, ArrowLeft, Loader2, MessageSquare, Image as ImageIcon, X, Mic, StopCircle, Trash2 } from 'lucide-react';
 import { useOnlineUsers } from './OnlinePresence';
 import dayjs from 'dayjs';
 
@@ -12,6 +12,15 @@ export default function Chat({ session, onBack, selectedUser }) {
   const [isTyping, setIsTyping] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [lightboxImage, setLightboxImage] = useState(null);
+
+  // Audio Recording State
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const timerIntervalRef = useRef(null);
+  const isCancelledRef = useRef(false);
+
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const channelRef = useRef(null);
@@ -134,6 +143,107 @@ export default function Chat({ session, onBack, selectedUser }) {
     setTimeout(() => {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, 100);
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+      isCancelledRef.current = false;
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          audioChunksRef.current.push(e.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        audioChunksRef.current = [];
+
+        // Parar todas as faixas do microfone para desligar a luz vermelha de gravação no navegador
+        stream.getTracks().forEach(track => track.stop());
+
+        if (isCancelledRef.current) {
+           return;
+        }
+
+        // Faz o upload
+        await handleAudioUpload(audioBlob);
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordingDuration(0);
+
+      // Inicia cronômetro
+      timerIntervalRef.current = setInterval(() => {
+        setRecordingDuration(prev => prev + 1);
+      }, 1000);
+
+    } catch (err) {
+      console.error('Erro ao acessar microfone:', err);
+      alert('Não foi possível acessar o microfone. Verifique as permissões.');
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      clearInterval(timerIntervalRef.current);
+    }
+  };
+
+  const cancelRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      isCancelledRef.current = true;
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      clearInterval(timerIntervalRef.current);
+      setRecordingDuration(0);
+    }
+  };
+
+  const handleAudioUpload = async (audioBlob) => {
+    // Se o blob estiver vazio ou zerado (ex: cancelado), não faz nada
+    if (!audioBlob || audioBlob.size === 0) return;
+
+    try {
+      setUploadingImage(true); // Reusing uploading state for loader
+      const fileName = `${session.user.id}-${Math.random()}.webm`;
+      const filePath = `chat-audio/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('post_images')
+        .upload(filePath, audioBlob, { contentType: 'audio/webm' });
+
+      if (uploadError) throw uploadError;
+
+      const { data: publicUrlData } = supabase.storage
+        .from('post_images')
+        .getPublicUrl(filePath);
+
+      const audioUrl = publicUrlData.publicUrl;
+
+      // O formato do link determinará como será renderizado. Enviaremos o link.
+      const { error: msgError } = await supabase.from('messages').insert([{
+        sender_id: session.user.id,
+        receiver_id: selectedUser.id,
+        content: audioUrl
+      }]);
+
+      if (msgError) throw msgError;
+      scrollToBottom();
+    } catch (error) {
+      console.error('Erro ao enviar áudio', error);
+      alert('Erro ao enviar áudio.');
+    } finally {
+      setUploadingImage(false);
+      setRecordingDuration(0);
+    }
   };
 
   const handleImageUpload = async (e) => {
@@ -265,13 +375,20 @@ export default function Chat({ session, onBack, selectedUser }) {
                       : 'bg-white border border-gray-200 text-gray-800 rounded-tl-none shadow-sm'
                   }`}
                 >
-                  {msg.content.startsWith('http') && (msg.content.includes('supabase.co') || msg.content.includes('chat/')) ? (
-                    <img
-                      src={msg.content}
-                      alt="Imagem"
-                      className="max-w-full rounded-lg cursor-pointer hover:opacity-90"
-                      onClick={() => setLightboxImage(msg.content)}
-                    />
+                  {msg.content.startsWith('http') && (msg.content.includes('supabase.co') || msg.content.includes('chat')) ? (
+                    msg.content.endsWith('.webm') || msg.content.endsWith('.mp3') || msg.content.includes('chat-audio') ? (
+                      <audio controls className="max-w-[200px] sm:max-w-xs outline-none">
+                        <source src={msg.content} type="audio/webm" />
+                        Seu navegador não suporta áudio.
+                      </audio>
+                    ) : (
+                      <img
+                        src={msg.content}
+                        alt="Imagem"
+                        className="max-w-full rounded-lg cursor-pointer hover:opacity-90"
+                        onClick={() => setLightboxImage(msg.content)}
+                      />
+                    )
                   ) : (
                     msg.content
                   )}
@@ -294,30 +411,68 @@ export default function Chat({ session, onBack, selectedUser }) {
 
       {/* Input Area */}
       <form onSubmit={handleSendMessage} className="p-3 border-t border-gray-100 bg-white flex gap-2 items-center">
-        <label className="p-2 text-gray-500 hover:text-primary-600 hover:bg-gray-50 rounded-full transition cursor-pointer">
-          {uploadingImage ? <Loader2 className="w-5 h-5 animate-spin" /> : <ImageIcon className="w-5 h-5" />}
-          <input
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleImageUpload}
-            disabled={uploadingImage}
-          />
-        </label>
-        <input
-          type="text"
-          value={newMessage}
-          onChange={handleTyping}
-          placeholder="Digite uma mensagem..."
-          className="flex-1 bg-gray-100 border-none rounded-full px-4 py-2 text-sm focus:ring-1 focus:ring-primary-500"
-        />
-        <button
-          type="submit"
-          disabled={!newMessage.trim()}
-          className="p-2 bg-primary-600 text-white rounded-full disabled:opacity-50 hover:bg-primary-700 transition"
-        >
-          <Send className="w-4 h-4" />
-        </button>
+        {!isRecording ? (
+          <>
+            <label className="p-2 text-gray-500 hover:text-primary-600 hover:bg-gray-50 rounded-full transition cursor-pointer">
+              {uploadingImage ? <Loader2 className="w-5 h-5 animate-spin" /> : <ImageIcon className="w-5 h-5" />}
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleImageUpload}
+                disabled={uploadingImage}
+              />
+            </label>
+            <input
+              type="text"
+              value={newMessage}
+              onChange={handleTyping}
+              placeholder="Digite uma mensagem..."
+              className="flex-1 bg-gray-100 border-none rounded-full px-4 py-2 text-sm focus:ring-1 focus:ring-primary-500"
+            />
+            {newMessage.trim() ? (
+              <button
+                type="submit"
+                className="p-2 bg-primary-600 text-white rounded-full hover:bg-primary-700 transition"
+              >
+                <Send className="w-4 h-4" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={startRecording}
+                className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-full transition"
+              >
+                <Mic className="w-5 h-5" />
+              </button>
+            )}
+          </>
+        ) : (
+          <div className="flex-1 flex items-center justify-between bg-red-50 rounded-full px-4 py-1.5 border border-red-100">
+            <div className="flex items-center gap-2 text-red-600">
+              <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse"></span>
+              <span className="text-sm font-medium">Gravando... 00:{recordingDuration.toString().padStart(2, '0')}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={cancelRecording}
+                className="p-1.5 text-gray-400 hover:text-red-500 transition rounded-full"
+                title="Cancelar"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={stopRecording}
+                className="p-1.5 bg-red-500 text-white hover:bg-red-600 transition rounded-full shadow-sm"
+                title="Enviar"
+              >
+                <StopCircle className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </form>
 
       {lightboxImage && (
