@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 
 export default function Login() {
   const [isRegistering, setIsRegistering] = useState(false);
@@ -26,7 +27,7 @@ export default function Login() {
         redirectTo: window.location.origin,
       });
       if (error) throw error;
-      alert('Se uma conta existir com esse email, você receberá um link de recuperação.');
+      toast.success('Se uma conta existir com esse email, você receberá um link de recuperação.');
       setIsForgotPassword(false);
     } catch (err) {
       setError(err.message);
@@ -60,7 +61,7 @@ export default function Login() {
         if (data?.session) {
           navigate('/');
         } else {
-          alert('Cadastro realizado! Verifique seu email para confirmar a conta (caso a confirmação esteja ativada no Supabase).');
+          toast.success('Cadastro realizado! Verifique seu email para confirmar a conta (caso a confirmação esteja ativada no Supabase).');
         }
       } else {
         // Login
@@ -81,11 +82,11 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="bg-white max-w-md w-full rounded-2xl shadow-xl p-8">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-800 flex items-center justify-center p-4">
+      <div className="bg-white dark:bg-gray-800 max-w-md w-full rounded-2xl shadow-xl p-8">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-primary-600 mb-2">SocialPWA</h1>
-          <p className="text-gray-500">
+          <p className="text-gray-500 dark:text-gray-400">
             {isForgotPassword
               ? 'Recupere sua senha.'
               : isRegistering
@@ -103,13 +104,13 @@ export default function Login() {
         {isForgotPassword ? (
           <form onSubmit={handleForgotPassword} className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email</label>
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
                 placeholder="seu@email.com"
               />
             </div>
@@ -137,36 +138,36 @@ export default function Login() {
           <form onSubmit={handleSubmit} className="space-y-6">
           {isRegistering && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Nome Completo</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Nome Completo</label>
               <input
                 type="text"
                 required
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
                 placeholder="Seu nome"
               />
             </div>
           )}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email</label>
             <input
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
+              className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
               placeholder="seu@email.com"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Senha</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Senha</label>
             <input
               type="password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
+              className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
               placeholder="••••••••"
             />
           </div>
@@ -200,7 +201,7 @@ export default function Login() {
                   setIsForgotPassword(true);
                   setError(null);
                 }}
-                className="text-gray-500 hover:text-gray-700 text-sm"
+                className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300 text-sm"
               >
                 Esqueceu sua senha?
               </button>
@@ -208,9 +209,9 @@ export default function Login() {
           </div>
         )}
 
-        <div className="mt-6 pt-6 border-t border-gray-100 hidden">
+        <div className="mt-6 pt-6 border-t border-gray-100 dark:border-gray-800 hidden">
            {/* Futura integração com OAuth (Google) */}
-          <button className="w-full bg-white border border-gray-300 text-gray-700 font-semibold py-3 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center gap-3">
+          <button className="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-semibold py-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-3">
             Continuar com Google
           </button>
         </div>

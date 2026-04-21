@@ -84,12 +84,12 @@ export default function Layout({ session }) {
   ];
 
   return (
-    <div className="flex h-screen bg-gray-50 flex-col md:flex-row overflow-hidden pt-0 relative">
+    <div className="flex h-screen bg-gray-50 dark:bg-gray-800 dark:bg-gray-900 flex-col md:flex-row overflow-hidden pt-0 relative transition-colors duration-200">
       <OfflineBanner />
       {/* Sidebar for Desktop */}
-      <aside className="hidden md:flex flex-col w-64 bg-white border-r border-gray-200">
-        <div className="p-4 border-b border-gray-200">
-          <h1 className="text-xl font-bold text-primary-600">SocialPWA</h1>
+      <aside className="hidden md:flex flex-col w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transition-colors duration-200">
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+          <h1 className="text-xl font-bold text-primary-600 dark:text-primary-400">SocialPWA</h1>
         </div>
         <nav className="flex-1 p-4 space-y-2">
           {navItems.map((item) => (
@@ -100,8 +100,8 @@ export default function Layout({ session }) {
                 clsx(
                   'flex items-center space-x-3 p-3 rounded-lg transition-colors',
                   isActive
-                    ? 'bg-primary-50 text-primary-600'
-                    : 'text-gray-600 hover:bg-gray-100'
+                    ? 'bg-primary-50 dark:bg-primary-900/50 text-primary-600 dark:text-primary-400'
+                    : 'text-gray-600 dark:text-gray-400 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-600 dark:bg-gray-700 dark:hover:bg-gray-700'
                 )
               }
             >
@@ -119,10 +119,10 @@ export default function Layout({ session }) {
         </nav>
 
         {/* Logout Desktop */}
-        <div className="p-4 border-t border-gray-200">
+        <div className="p-4 border-t border-gray-200 dark:border-gray-700">
           <button
             onClick={handleLogout}
-            className="flex items-center space-x-3 p-3 w-full text-left text-gray-600 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors"
+            className="flex items-center space-x-3 p-3 w-full text-left text-gray-600 dark:text-gray-400 dark:text-gray-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 rounded-lg transition-colors"
           >
             <LogOut className="w-5 h-5" />
             <span className="font-medium">Sair</span>
@@ -133,9 +133,9 @@ export default function Layout({ session }) {
       {/* Main Content */}
       <main onScroll={handleScroll} className="flex-1 overflow-y-auto w-full pb-16 md:pb-0 transition-all">
         {/* Mobile Header */}
-        <header className="md:hidden bg-white border-b border-gray-200 p-4 sticky top-0 z-10 flex justify-between items-center">
-          <h1 className="text-xl font-bold text-primary-600">SocialPWA</h1>
-          <button onClick={handleLogout} className="text-gray-500 p-2">
+        <header className="md:hidden bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 sticky top-0 z-10 flex justify-between items-center transition-colors duration-200">
+          <h1 className="text-xl font-bold text-primary-600 dark:text-primary-400">SocialPWA</h1>
+          <button onClick={handleLogout} className="text-gray-500 dark:text-gray-400 dark:text-gray-400 p-2">
             <LogOut className="w-5 h-5" />
           </button>
         </header>
@@ -147,7 +147,7 @@ export default function Layout({ session }) {
 
       {/* Bottom Tab Bar for Mobile */}
       <nav className={clsx(
-        "md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around p-2 pb-safe z-20 transition-transform duration-300",
+        "md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 flex justify-around p-2 pb-safe z-20 transition-transform duration-300 transition-colors duration-200",
         !showBottomNav && "translate-y-full"
       )}>
         {navItems.map((item) => (
@@ -157,7 +157,7 @@ export default function Layout({ session }) {
             className={({ isActive }) =>
               clsx(
                 'flex flex-col items-center p-2 rounded-lg relative',
-                isActive ? 'text-primary-600' : 'text-gray-500'
+                isActive ? 'text-primary-600 dark:text-primary-400' : 'text-gray-500 dark:text-gray-400 dark:text-gray-400'
               )
             }
           >

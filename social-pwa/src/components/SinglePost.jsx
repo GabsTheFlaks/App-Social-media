@@ -18,12 +18,13 @@ export default function SinglePost({ session }) {
           .from('posts')
           .select(`
             *,
-            profiles (full_name, avatar_url, role),
+            profiles (full_name, avatar_url, role, badges),
             likes (user_id),
-            comments (*, profiles (full_name, avatar_url), comment_likes (user_id)),
+            comments (*, profiles (full_name, avatar_url, badges), comment_likes (user_id)),
+            saved_posts (user_id),
             original:original_post_id (
               id, content, image_url, image_urls, created_at,
-              profiles (full_name, avatar_url)
+              profiles (full_name, avatar_url, badges)
             )
           `)
           .eq('id', id)
@@ -34,6 +35,7 @@ export default function SinglePost({ session }) {
         const formattedPost = {
           ...data,
           isLiked: data.likes.some((like) => like.user_id === session.user.id),
+          isSaved: data.saved_posts?.some((saved) => saved.user_id === session.user.id),
           likesCount: data.likes.length,
           commentsCount: data.comments?.length || 0,
           showComments: true, // Auto open comments on single view
@@ -72,7 +74,7 @@ export default function SinglePost({ session }) {
       setPost(p => ({ ...p, newComment: '' }));
       const { data, error } = await supabase.from('comments')
         .insert([{ post_id: postId, user_id: session.user.id, content: content.trim() }])
-        .select('*, profiles (full_name, avatar_url), comment_likes (user_id)')
+        .select('*, profiles (full_name, avatar_url, badges), comment_likes (user_id)')
         .single();
       if (error) throw error;
       setPost(p => ({ ...p, comments: [...(p.comments || []), data], commentsCount: p.commentsCount + 1 }));
@@ -134,6 +136,20 @@ export default function SinglePost({ session }) {
     } catch (err) { console.error(err); }
   };
 
+  const handleSavePost = async (postId, isSaved) => {
+    try {
+      setPost(p => ({ ...p, isSaved: !isSaved }));
+      if (isSaved) {
+        await supabase.from('saved_posts').delete().match({ post_id: postId, user_id: session.user.id });
+      } else {
+        await supabase.from('saved_posts').insert([{ post_id: postId, user_id: session.user.id }]);
+      }
+    } catch (err) {
+      console.error(err);
+      setPost(p => ({ ...p, isSaved: isSaved }));
+    }
+  };
+
   const handleRepost = async (postToRepost) => {
     if (!window.confirm('Deseja compartilhar esta publicação?')) return;
     try {
@@ -144,11 +160,11 @@ export default function SinglePost({ session }) {
   };
 
   if (loading) return <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-primary-500" /></div>;
-  if (!post) return <div className="text-center py-12 text-gray-500">Publicação não encontrada ou indisponível.</div>;
+  if (!post) return <div className="text-center py-12 text-gray-500 dark:text-gray-400">Publicação não encontrada ou indisponível.</div>;
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
-      <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4">
+      <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:text-gray-100 mb-4">
         <ArrowLeft className="w-5 h-5" />
         <span>Voltar</span>
       </button>
@@ -168,6 +184,7 @@ export default function SinglePost({ session }) {
         onCommentEdit={handleCommentEdit}
         onCommentDelete={handleCommentDelete}
         onEdit={handleEditPost}
+        onSave={handleSavePost}
       />
 
       {lightboxImage && (

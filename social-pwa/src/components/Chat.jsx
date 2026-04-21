@@ -327,10 +327,10 @@ export default function Chat({ session, onBack, selectedUser }) {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] md:h-[600px] bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+    <div className="flex flex-col h-[calc(100vh-4rem)] md:h-[600px] bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden">
       {/* Chat Header */}
-      <div className="p-3 border-b border-gray-100 flex items-center gap-3 bg-white z-10">
-        <button onClick={onBack} className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-full">
+      <div className="p-3 border-b border-gray-100 dark:border-gray-800 flex items-center gap-3 bg-white dark:bg-gray-800 z-10">
+        <button onClick={onBack} className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-full">
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div className="relative">
@@ -340,15 +340,15 @@ export default function Chat({ session, onBack, selectedUser }) {
           )}
         </div>
         <div>
-          <h3 className="font-bold text-gray-900 text-sm leading-tight">{selectedUser.full_name}</h3>
-          <span className="text-xs text-gray-500">
+          <h3 className="font-bold text-gray-900 dark:text-gray-100 text-sm leading-tight">{selectedUser.full_name}</h3>
+          <span className="text-xs text-gray-500 dark:text-gray-400">
             {isTyping ? <span className="text-primary-600 italic">digitando...</span> : (isOnline ? 'Online agora' : selectedUser.role)}
           </span>
         </div>
       </div>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 dark:bg-gray-800">
         {loading ? (
           <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-gray-400" /></div>
         ) : messages.length === 0 ? (
@@ -372,7 +372,7 @@ export default function Chat({ session, onBack, selectedUser }) {
                   className={`max-w-[75%] rounded-2xl px-4 py-2 text-sm ${
                     isMine
                       ? 'bg-primary-600 text-white rounded-tr-none'
-                      : 'bg-white border border-gray-200 text-gray-800 rounded-tl-none shadow-sm'
+                      : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200 rounded-tl-none shadow-sm'
                   }`}
                 >
                   {msg.content.startsWith('http') && (msg.content.includes('supabase.co') || msg.content.includes('chat')) ? (
@@ -399,7 +399,7 @@ export default function Chat({ session, onBack, selectedUser }) {
         )}
         {isTyping && (
           <div className="flex items-start">
-            <div className="bg-white border border-gray-200 text-gray-500 rounded-2xl rounded-tl-none px-4 py-2 text-xs shadow-sm italic flex gap-1 items-center">
+            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 rounded-2xl rounded-tl-none px-4 py-2 text-xs shadow-sm italic flex gap-1 items-center">
                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></span>
                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></span>
                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.4s'}}></span>
@@ -410,10 +410,10 @@ export default function Chat({ session, onBack, selectedUser }) {
       </div>
 
       {/* Input Area */}
-      <form onSubmit={handleSendMessage} className="p-3 border-t border-gray-100 bg-white flex gap-2 items-center">
+      <form onSubmit={handleSendMessage} className="p-3 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-800 flex gap-2 items-center">
         {!isRecording ? (
           <>
-            <label className="p-2 text-gray-500 hover:text-primary-600 hover:bg-gray-50 rounded-full transition cursor-pointer">
+            <label className="p-2 text-gray-500 dark:text-gray-400 hover:text-primary-600 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-full transition cursor-pointer">
               {uploadingImage ? <Loader2 className="w-5 h-5 animate-spin" /> : <ImageIcon className="w-5 h-5" />}
               <input
                 type="file"
@@ -428,7 +428,7 @@ export default function Chat({ session, onBack, selectedUser }) {
               value={newMessage}
               onChange={handleTyping}
               placeholder="Digite uma mensagem..."
-              className="flex-1 bg-gray-100 border-none rounded-full px-4 py-2 text-sm focus:ring-1 focus:ring-primary-500"
+              className="flex-1 bg-gray-100 dark:bg-gray-700 border-none rounded-full px-4 py-2 text-sm focus:ring-1 focus:ring-primary-500"
             />
             {newMessage.trim() ? (
               <button
@@ -441,7 +441,7 @@ export default function Chat({ session, onBack, selectedUser }) {
               <button
                 type="button"
                 onClick={startRecording}
-                className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-full transition"
+                className="p-2 text-gray-500 dark:text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition"
               >
                 <Mic className="w-5 h-5" />
               </button>

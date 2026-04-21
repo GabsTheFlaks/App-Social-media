@@ -71,7 +71,7 @@ export default function Notifications({ session }) {
       case 'connection_accepted': return <CheckCircle2 className="w-5 h-5 text-green-500" />;
       case 'repost': return <Share2 className="w-5 h-5 text-indigo-500" />;
       case 'message': return <MessageCircle className="w-5 h-5 text-teal-500" />;
-      default: return <MessageCircle className="w-5 h-5 text-gray-500" />;
+      default: return <MessageCircle className="w-5 h-5 text-gray-500 dark:text-gray-400" />;
     }
   };
 
@@ -91,9 +91,9 @@ export default function Notifications({ session }) {
   if (loading) return <div className="text-center p-8">Carregando notificações...</div>;
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-      <div className="p-4 border-b border-gray-100">
-        <h2 className="text-lg font-bold text-gray-900">Notificações</h2>
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden">
+      <div className="p-4 border-b border-gray-100 dark:border-gray-800">
+        <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">Notificações</h2>
       </div>
 
       <div className="divide-y divide-gray-50">
@@ -128,15 +128,15 @@ export default function Notifications({ session }) {
                     alt="Avatar"
                     className="w-12 h-12 rounded-full object-cover"
                   />
-                  <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 shadow-sm">
+                  <div className="absolute -bottom-1 -right-1 bg-white dark:bg-gray-800 rounded-full p-0.5 shadow-sm">
                     {getIcon(notif.type)}
                   </div>
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm text-gray-800">
+                  <p className="text-sm text-gray-800 dark:text-gray-200">
                     {getMessage(notif)}
                   </p>
-                  <span className="text-xs text-gray-500 mt-1 block">
+                  <span className="text-xs text-gray-500 dark:text-gray-400 mt-1 block">
                     {dayjs(notif.created_at).fromNow()}
                   </span>
                 </div>
@@ -148,7 +148,7 @@ export default function Notifications({ session }) {
                   <Link
                     to={linkTo}
                     key={notif.id}
-                    className={`p-4 flex items-start gap-4 hover:bg-gray-50 transition-colors ${!notif.read ? 'bg-primary-50/30' : ''} cursor-pointer`}
+                    className={`p-4 flex items-start gap-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${!notif.read ? 'bg-primary-50/30' : ''} cursor-pointer`}
                   >
                     {content}
                   </Link>
@@ -158,7 +158,7 @@ export default function Notifications({ session }) {
             return (
               <div
                 key={notif.id}
-                className={`p-4 flex items-start gap-4 hover:bg-gray-50 transition-colors ${!notif.read ? 'bg-primary-50/30' : ''}`}
+                className={`p-4 flex items-start gap-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${!notif.read ? 'bg-primary-50/30' : ''}`}
               >
                 {content}
               </div>
