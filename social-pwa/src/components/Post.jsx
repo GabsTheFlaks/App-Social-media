@@ -113,7 +113,7 @@ export default function Post({
             </div>
           </div>
         </Link>
-        {post.user_id === session.user.id && !post.is_repost && !isEditingPost && (
+        {post.user_id === session.user.id && !isEditingPost && (
           <div className="flex items-center gap-1">
             <button
               onClick={startEditPost}
