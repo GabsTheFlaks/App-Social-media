@@ -105,7 +105,9 @@ export default function MessagesList({ session }) {
                 </div>
                 <div className="flex justify-between items-center">
                   <p className={`text-xs truncate ${chat.unread ? 'font-bold text-gray-800' : 'text-gray-500'}`}>
-                    {chat.lastMessage.startsWith('http') && chat.lastMessage.includes('chat/') ? '📷 Imagem' : chat.lastMessage}
+                    {chat.lastMessage.startsWith('http') && chat.lastMessage.includes('chat-audio/') ? '🎤 Áudio' :
+                     chat.lastMessage.startsWith('http') && chat.lastMessage.includes('chat/') ? '📷 Imagem' :
+                     chat.lastMessage}
                   </p>
                   {chat.unread && (
                     <div className="w-2.5 h-2.5 bg-primary-600 rounded-full ml-2 flex-shrink-0"></div>
