@@ -135,7 +135,7 @@ export default function Network({ session, onOpenChat }) {
     <div className="space-y-6">
 
       {/* Barra de Busca (Nova) */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-2 flex items-center">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-2 flex items-center">
         <Search className="w-5 h-5 text-gray-400 ml-2" />
         <input
           type="text"
@@ -145,27 +145,27 @@ export default function Network({ session, onOpenChat }) {
           className="flex-1 bg-transparent border-none focus:ring-0 text-sm p-2"
         />
         {searchQuery && (
-          <button onClick={() => setSearchQuery('')} className="p-2 text-gray-400 hover:text-gray-600">
+          <button onClick={() => setSearchQuery('')} className="p-2 text-gray-400 hover:text-gray-600 dark:text-gray-400">
             <X className="w-4 h-4" />
           </button>
         )}
       </div>
 
       {pendingRequests.length > 0 && !searchQuery && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-          <h2 className="text-lg font-bold text-gray-900 mb-4">Convites Pendentes</h2>
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-4">
+          <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">Convites Pendentes</h2>
           <div className="space-y-4">
             {pendingRequests.map(req => {
               const requester = users.find(u => u.id === req.follower_id);
               if (!requester) return null;
 
               return (
-                <div key={req.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div key={req.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                   <div className="flex items-center gap-3">
                     <img src={requester.avatar_url} alt="Avatar" className="w-12 h-12 rounded-full object-cover" />
                     <div>
-                      <h3 className="font-bold text-gray-900 text-sm">{requester.full_name}</h3>
-                      <p className="text-xs text-gray-500">{requester.role || 'Membro'}</p>
+                      <h3 className="font-bold text-gray-900 dark:text-gray-100 text-sm">{requester.full_name}</h3>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">{requester.role || 'Membro'}</p>
                     </div>
                   </div>
                   <div className="flex gap-2">
@@ -177,7 +177,7 @@ export default function Network({ session, onOpenChat }) {
                     </button>
                     <button
                       onClick={() => handleReject(req.id)}
-                      className="p-2 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300"
+                      className="p-2 bg-gray-200 text-gray-700 dark:text-gray-300 rounded-full hover:bg-gray-300"
                     >
                       <X className="w-4 h-4" />
                     </button>
@@ -189,8 +189,8 @@ export default function Network({ session, onOpenChat }) {
         </div>
       )}
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-        <h2 className="text-lg font-bold text-gray-900 mb-4">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-4">
+        <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">
           {searchQuery ? 'Resultados da Busca' : 'Pessoas que você talvez conheça'}
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -202,10 +202,10 @@ export default function Network({ session, onOpenChat }) {
             );
 
             return (
-              <div key={user.id} className="border border-gray-100 rounded-xl p-4 flex flex-col items-center text-center">
+              <div key={user.id} className="border border-gray-100 dark:border-gray-800 rounded-xl p-4 flex flex-col items-center text-center">
                 <img src={user.avatar_url} alt="Avatar" className="w-20 h-20 rounded-full object-cover mb-3" />
-                <h3 className="font-bold text-gray-900">{user.full_name}</h3>
-                <p className="text-xs text-gray-500 mb-4 min-h-[32px]">{user.role || 'Sem cargo definido'}</p>
+                <h3 className="font-bold text-gray-900 dark:text-gray-100">{user.full_name}</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-4 min-h-[32px]">{user.role || 'Sem cargo definido'}</p>
 
                 {status === 'none' && (
                   <button
@@ -220,7 +220,7 @@ export default function Network({ session, onOpenChat }) {
                 {status === 'pending_sent' && (
                   <button
                     onClick={() => handleReject(conn.id)}
-                    className="w-full flex items-center justify-center gap-2 py-1.5 border border-gray-300 text-gray-500 rounded-full font-medium hover:bg-gray-50 transition-colors text-sm"
+                    className="w-full flex items-center justify-center gap-2 py-1.5 border border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 rounded-full font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm"
                   >
                     <Clock className="w-4 h-4" />
                     Pendente
@@ -250,7 +250,7 @@ export default function Network({ session, onOpenChat }) {
                 )}
 
                 {status === 'pending_received' && (
-                  <span className="w-full text-xs text-gray-500 py-1.5 block">
+                  <span className="w-full text-xs text-gray-500 dark:text-gray-400 py-1.5 block">
                     Responda acima
                   </span>
                 )}
@@ -260,7 +260,7 @@ export default function Network({ session, onOpenChat }) {
           })}
 
           {filteredUsers.length === 0 && (
-            <div className="col-span-full flex flex-col items-center justify-center p-8 text-center text-gray-500">
+            <div className="col-span-full flex flex-col items-center justify-center p-8 text-center text-gray-500 dark:text-gray-400">
               <Search className="w-12 h-12 text-gray-300 mb-3" />
               <p className="text-sm">Nenhum usuário encontrado na busca.</p>
             </div>

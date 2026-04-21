@@ -58,9 +58,9 @@ export default function MessagesList({ session }) {
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden min-h-[50vh]">
-      <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-        <h2 className="text-lg font-bold text-gray-900">Mensagens</h2>
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden min-h-[50vh]">
+      <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+        <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">Mensagens</h2>
       </div>
 
       <div className="divide-y divide-gray-50">
@@ -82,13 +82,13 @@ export default function MessagesList({ session }) {
             <div
               key={chat.user.id}
               onClick={() => navigate(`/chat/${chat.user.id}`)}
-              className="p-4 flex gap-4 hover:bg-gray-50 transition-colors cursor-pointer items-center"
+              className="p-4 flex gap-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer items-center"
             >
               <div className="relative">
                 <img
                   src={chat.user.avatar_url}
                   alt="Avatar"
-                  className="w-12 h-12 rounded-full object-cover border border-gray-100"
+                  className="w-12 h-12 rounded-full object-cover border border-gray-100 dark:border-gray-800"
                 />
                 {isOnline && (
                   <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
@@ -96,7 +96,7 @@ export default function MessagesList({ session }) {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex justify-between items-center mb-1">
-                  <h3 className={`font-bold text-sm truncate ${chat.unread ? 'text-gray-900' : 'text-gray-800'}`}>
+                  <h3 className={`font-bold text-sm truncate ${chat.unread ? 'text-gray-900 dark:text-gray-100' : 'text-gray-800 dark:text-gray-200'}`}>
                     {chat.user.full_name}
                   </h3>
                   <span className="text-[10px] text-gray-400 whitespace-nowrap ml-2">
@@ -104,7 +104,7 @@ export default function MessagesList({ session }) {
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <p className={`text-xs truncate ${chat.unread ? 'font-bold text-gray-800' : 'text-gray-500'}`}>
+                  <p className={`text-xs truncate ${chat.unread ? 'font-bold text-gray-800 dark:text-gray-200' : 'text-gray-500 dark:text-gray-400'}`}>
                     {chat.lastMessage.startsWith('http') && chat.lastMessage.includes('chat-audio/') ? '🎤 Áudio' :
                      chat.lastMessage.startsWith('http') && chat.lastMessage.includes('chat/') ? '📷 Imagem' :
                      chat.lastMessage}

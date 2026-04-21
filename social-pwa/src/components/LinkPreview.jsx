@@ -46,14 +46,14 @@ export default function LinkPreview({ url }) {
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      className="block mt-3 border border-gray-200 rounded-xl overflow-hidden hover:bg-gray-50 transition-colors group relative"
+      className="block mt-3 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors group relative"
     >
       {data.image?.url && (
         <div className="relative">
           <img
             src={data.image.url}
             alt={data.title}
-            className="w-full h-48 object-cover border-b border-gray-200"
+            className="w-full h-48 object-cover border-b border-gray-200 dark:border-gray-700"
             onError={(e) => {
               // Se a imagem falhar (ex: maxresdefault não existe em alguns vídeos antigos), usa a default
               if (data.isYouTube && e.target.src.includes('maxresdefault')) {
@@ -71,11 +71,11 @@ export default function LinkPreview({ url }) {
         </div>
       )}
       <div className="p-3">
-        <h4 className="font-bold text-gray-900 text-sm line-clamp-1 group-hover:text-primary-600 transition-colors">
+        <h4 className="font-bold text-gray-900 dark:text-gray-100 text-sm line-clamp-1 group-hover:text-primary-600 transition-colors">
           {data.title || url}
         </h4>
         {data.description && !data.isYouTube && (
-          <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
             {data.description}
           </p>
         )}

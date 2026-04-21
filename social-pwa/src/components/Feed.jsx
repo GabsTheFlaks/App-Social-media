@@ -51,12 +51,13 @@ export default function Feed({ session }) {
         .from('posts')
         .select(`
           *,
-          profiles (full_name, avatar_url, role),
+          profiles (full_name, avatar_url, role, badges),
           likes (user_id),
-          comments (*, profiles (full_name, avatar_url), comment_likes (user_id)),
+          comments (*, profiles (full_name, avatar_url, badges), comment_likes (user_id)),
+          saved_posts (user_id),
           original:original_post_id (
             id, content, image_url, image_urls, created_at,
-            profiles (full_name, avatar_url)
+            profiles (full_name, avatar_url, badges)
           )
         `)
         .order('created_at', { ascending: false })
@@ -87,6 +88,7 @@ export default function Feed({ session }) {
       const formattedPosts = filteredPosts.map((post) => ({
         ...post,
         isLiked: post.likes.some((like) => like.user_id === session.user.id),
+        isSaved: post.saved_posts?.some((saved) => saved.user_id === session.user.id),
         likesCount: post.likes.length,
         commentsCount: post.comments?.length || 0,
         showComments: false,
@@ -350,6 +352,21 @@ export default function Feed({ session }) {
     }
   };
 
+  const handleUnfollow = async (targetUserId) => {
+    if (!window.confirm("Deseja realmente deixar de seguir este usuário?")) return;
+    try {
+      await supabase
+        .from('connections')
+        .delete()
+        .or(`and(follower_id.eq.${session.user.id},following_id.eq.${targetUserId}),and(follower_id.eq.${targetUserId},following_id.eq.${session.user.id})`);
+
+      // Remove posts from this user from the feed
+      setPosts(currentPosts => currentPosts.filter(p => p.user_id !== targetUserId));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const handleEditPost = async (postId, newContent) => {
     if (!newContent.trim()) return;
     try {
@@ -369,6 +386,20 @@ export default function Feed({ session }) {
     }
   };
 
+  const handleSavePost = async (postId, isSaved) => {
+    try {
+      setPosts(posts.map(p => p.id === postId ? { ...p, isSaved: !isSaved } : p));
+      if (isSaved) {
+        await supabase.from('saved_posts').delete().match({ post_id: postId, user_id: session.user.id });
+      } else {
+        await supabase.from('saved_posts').insert([{ post_id: postId, user_id: session.user.id }]);
+      }
+    } catch (err) {
+      console.error(err);
+      setPosts(posts.map(p => p.id === postId ? { ...p, isSaved: isSaved } : p));
+    }
+  };
+
   const handleCommentChange = (postId, text) => {
     setPosts(posts.map(p => p.id === postId ? { ...p, newComment: text } : p));
   };
@@ -379,7 +410,7 @@ export default function Feed({ session }) {
     try {
       const { data, error } = await supabase.from('comments')
         .insert([{ post_id: postId, user_id: session.user.id, content: content.trim() }])
-        .select('*, profiles (full_name, avatar_url), comment_likes (user_id)')
+        .select('*, profiles (full_name, avatar_url, badges), comment_likes (user_id)')
         .single();
 
       if (error) throw error;
@@ -469,20 +500,20 @@ export default function Feed({ session }) {
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
       {/* Create Post Area */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-4">
         <form onSubmit={handlePost}>
           <div className="flex gap-4">
             <img
               src={profile?.avatar_url || `https://ui-avatars.com/api/?name=${session.user.email}`}
               alt="Avatar"
-              className="w-12 h-12 rounded-full object-cover border border-gray-200"
+              className="w-12 h-12 rounded-full object-cover border border-gray-200 dark:border-gray-700"
             />
             <div className="flex-1 space-y-3">
               <textarea
                 value={newPost}
                 onChange={(e) => setNewPost(e.target.value)}
                 placeholder="Sobre o que você quer falar?"
-                className="w-full bg-transparent border-none focus:ring-0 resize-none text-gray-800 placeholder-gray-500 min-h-[60px]"
+                className="w-full bg-transparent border-none focus:ring-0 resize-none text-gray-800 dark:text-gray-200 placeholder-gray-500 min-h-[60px]"
                 rows="2"
               />
 
@@ -493,7 +524,7 @@ export default function Feed({ session }) {
                       <img
                         src={URL.createObjectURL(img)}
                         alt="Preview"
-                        className="h-24 w-24 object-cover rounded-lg border border-gray-200"
+                        className="h-24 w-24 object-cover rounded-lg border border-gray-200 dark:border-gray-700"
                       />
                       <button
                         type="button"
@@ -507,9 +538,9 @@ export default function Feed({ session }) {
                 </div>
               )}
 
-              <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+              <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-800">
                 <div className="flex items-center gap-2">
-                  <label className="flex items-center gap-2 text-gray-500 hover:text-primary-600 hover:bg-primary-50 px-3 py-2 rounded-full transition-colors cursor-pointer">
+                  <label className="flex items-center gap-2 text-gray-500 dark:text-gray-400 hover:text-primary-600 hover:bg-primary-50 px-3 py-2 rounded-full transition-colors cursor-pointer">
                     <ImageIcon className="w-5 h-5" />
                     <span className="text-sm font-medium hidden sm:inline">Mídia</span>
                     <input
@@ -525,7 +556,7 @@ export default function Feed({ session }) {
                   <select
                     value={visibility}
                     onChange={(e) => setVisibility(e.target.value)}
-                    className="text-xs text-gray-500 bg-gray-50 border-none rounded-full py-1.5 px-3 cursor-pointer hover:bg-gray-100 focus:ring-0"
+                    className="text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 border-none rounded-full py-1.5 px-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 dark:bg-gray-700 focus:ring-0"
                   >
                     <option value="public">🌍 Público</option>
                     <option value="connections">👥 Conexões</option>
@@ -557,12 +588,12 @@ export default function Feed({ session }) {
              <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
           </div>
         ) : posts.length === 0 ? (
-          <div className="text-center py-12 px-4 bg-white rounded-xl border border-gray-100">
-             <div className="bg-gray-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+          <div className="text-center py-12 px-4 bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-800">
+             <div className="bg-gray-50 dark:bg-gray-800 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                <Users className="w-8 h-8 text-gray-400" />
              </div>
-             <h3 className="font-bold text-gray-900 mb-1">Seu feed está vazio</h3>
-             <p className="text-gray-500 text-sm mb-4">Acompanhe as publicações da sua rede.</p>
+             <h3 className="font-bold text-gray-900 dark:text-gray-100 mb-1">Seu feed está vazio</h3>
+             <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">Acompanhe as publicações da sua rede.</p>
              <Link to="/network" className="bg-primary-600 text-white px-6 py-2 rounded-full font-medium text-sm hover:bg-primary-700">
                Encontrar pessoas
              </Link>
@@ -588,6 +619,8 @@ export default function Feed({ session }) {
                   onCommentEdit={handleCommentEdit}
                   onCommentDelete={handleCommentDelete}
                   onEdit={handleEditPost}
+                  onSave={handleSavePost}
+                  onUnfollow={handleUnfollow}
                 />
               </div>
             );
