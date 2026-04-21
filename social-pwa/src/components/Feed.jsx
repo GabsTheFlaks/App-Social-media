@@ -38,8 +38,8 @@ export default function Feed({ session }) {
       .from('profiles')
       .select('*')
       .eq('id', session.user.id)
-      .limit(1);
-    if (data && data.length > 0) setProfile(data[0]);
+      .single();
+    if (data) setProfile(data);
   };
 
   const fetchPosts = async (offset = 0) => {
@@ -54,8 +54,8 @@ export default function Feed({ session }) {
           profiles (full_name, avatar_url, role),
           likes (user_id),
           comments (*, profiles (full_name, avatar_url), comment_likes (user_id)),
-          original:posts!original_post_id (
-            id, content, image_url, created_at,
+          original:original_post_id (
+            id, content, image_url, image_urls, created_at,
             profiles (full_name, avatar_url)
           )
         `)
