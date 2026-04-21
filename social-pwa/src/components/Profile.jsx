@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Camera, MapPin, Briefcase, Mail, X } from 'lucide-react';
+import { Camera, MapPin, Briefcase, Mail, X, MessageSquare } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { compressImage } from '../lib/imageUtils';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Settings } from 'lucide-react';
 import Post from './Post';
 import EmptyState from './EmptyState';
+import { useOnlineUsers } from './OnlinePresence';
 
 export default function Profile({ session }) {
   const { id: routeId } = useParams();
@@ -17,9 +19,12 @@ export default function Profile({ session }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
+  const onlineUsers = useOnlineUsers(session);
+  const isOnline = onlineUsers.has(profileId);
 
   // Stats & Connections
   const [stats, setStats] = useState({ connections: 0, posts: 0 });
+  const [isConnected, setIsConnected] = useState(false);
 
   // Edit form state
   const [formData, setFormData] = useState({
@@ -77,6 +82,15 @@ export default function Profile({ session }) {
         .or(`follower_id.eq.${profileId},following_id.eq.${profileId}`);
 
       setStats(prev => ({ ...prev, posts: postsCount || 0, connections: connData?.length || 0 }));
+
+      // Se nao for o meu perfil, verificar se sou amigo para habilitar botao de chat
+      if (!isMyProfile) {
+         const amIConnected = connData?.some(c =>
+            (c.follower_id === session.user.id && c.following_id === profileId) ||
+            (c.following_id === session.user.id && c.follower_id === profileId)
+         );
+         setIsConnected(amIConnected);
+      }
     } catch(err) {
       console.error(err);
     } finally {
@@ -138,6 +152,22 @@ export default function Profile({ session }) {
       setStats(prev => ({ ...prev, posts: prev.posts > 0 ? prev.posts - 1 : 0 }));
     } catch (error) {
       console.error(error);
+    }
+  };
+
+  const handleEditPost = async (postId, newContent) => {
+    if (!newContent.trim()) return;
+    try {
+      setPosts(currentPosts => currentPosts.map(p => p.id === postId ? { ...p, content: newContent } : p));
+      const { error } = await supabase
+        .from('posts')
+        .update({ content: newContent })
+        .eq('id', postId)
+        .eq('user_id', session.user.id);
+      if (error) throw error;
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao editar post.");
     }
   };
 
@@ -310,13 +340,14 @@ export default function Profile({ session }) {
 
       setUploadingCover(true);
       const file = e.target.files[0];
-      const fileExt = file.name.split('.').pop();
+      const compressedFile = await compressImage(file);
+      const fileExt = compressedFile.name.split('.').pop();
       const fileName = `${session.user.id}-${Math.random()}.${fileExt}`;
       const filePath = `${session.user.id}/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('covers')
-        .upload(filePath, file);
+        .upload(filePath, compressedFile);
 
       if (uploadError) throw uploadError;
 
@@ -348,14 +379,15 @@ export default function Profile({ session }) {
 
       setUploadingAvatar(true);
       const file = e.target.files[0];
-      const fileExt = file.name.split('.').pop();
+      const compressedFile = await compressImage(file);
+      const fileExt = compressedFile.name.split('.').pop();
       const fileName = `${session.user.id}-${Math.random()}.${fileExt}`;
       const filePath = `${session.user.id}/${fileName}`;
 
       // Upload no Storage
       const { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(filePath, file);
+        .upload(filePath, compressedFile);
 
       if (uploadError) throw uploadError;
 
@@ -423,8 +455,11 @@ export default function Profile({ session }) {
                 alt={profile.full_name}
                 className={`w-24 h-24 md:w-32 md:h-32 rounded-full border-4 border-white bg-white object-cover ${uploadingAvatar ? 'opacity-50' : ''}`}
               />
+              {isOnline && !isMyProfile && (
+                <div className="absolute bottom-2 right-2 w-5 h-5 bg-green-500 rounded-full border-4 border-white" title="Online agora"></div>
+              )}
               {isMyProfile && (
-                <label className="absolute bottom-0 right-0 bg-primary-600 text-white p-2 rounded-full cursor-pointer hover:bg-primary-700 transition shadow-md">
+                <label className="absolute bottom-0 right-0 bg-primary-600 text-white p-2 rounded-full cursor-pointer hover:bg-primary-700 transition shadow-md z-10">
                   <Camera className="w-4 h-4" />
                   <input
                     type="file"
@@ -493,15 +528,28 @@ export default function Profile({ session }) {
                 )}
               </div>
 
-              <div className="flex gap-4 border-t border-gray-100 pt-4">
-                <div className="text-center cursor-pointer hover:opacity-80">
-                  <span className="block font-bold text-gray-900">{stats.connections}</span>
-                  <span className="text-xs text-gray-500">Conexões</span>
+              <div className="flex items-center justify-between border-t border-gray-100 pt-4">
+                <div className="flex gap-6">
+                  <div className="text-center cursor-pointer hover:opacity-80">
+                    <span className="block font-bold text-gray-900">{stats.connections}</span>
+                    <span className="text-xs text-gray-500">Conexões</span>
+                  </div>
+                  <div className="text-center cursor-pointer hover:opacity-80">
+                    <span className="block font-bold text-gray-900">{stats.posts}</span>
+                    <span className="text-xs text-gray-500">Posts</span>
+                  </div>
                 </div>
-                <div className="text-center cursor-pointer hover:opacity-80">
-                  <span className="block font-bold text-gray-900">{stats.posts}</span>
-                  <span className="text-xs text-gray-500">Posts</span>
-                </div>
+
+                {/* Botão de Mensagem para conexoes */}
+                {!isMyProfile && isConnected && (
+                  <button
+                    onClick={() => navigate(`/chat/${profileId}`)}
+                    className="flex items-center gap-2 bg-primary-100 text-primary-700 hover:bg-primary-200 px-4 py-2 rounded-full font-medium text-sm transition-colors"
+                  >
+                    <MessageSquare className="w-4 h-4" />
+                    Mensagem
+                  </button>
+                )}
               </div>
             </div>
           ) : (
@@ -583,6 +631,7 @@ export default function Profile({ session }) {
                   onCommentLike={handleCommentLike}
                   onCommentEdit={handleCommentEdit}
                   onCommentDelete={handleCommentDelete}
+                  onEdit={handleEditPost}
                 />
               ))}
             </div>

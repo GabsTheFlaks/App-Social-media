@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Heart, UserPlus, MessageCircle, CheckCircle2, Share2, Bell } from 'lucide-react';
 import EmptyState from './EmptyState';
 import { supabase } from '../lib/supabase';
+import { Link } from 'react-router-dom';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import 'dayjs/locale/pt-br';
@@ -105,31 +106,64 @@ export default function Notifications({ session }) {
             />
           </div>
         ) : (
-          notifications.map((notif) => (
-            <div
-              key={notif.id}
-              className={`p-4 flex gap-4 hover:bg-gray-50 transition-colors ${!notif.read ? 'bg-primary-50/30' : ''}`}
-            >
-              <div className="relative">
-                <img
-                  src={notif.actor?.avatar_url}
-                  alt="Avatar"
-                  className="w-12 h-12 rounded-full object-cover"
-                />
-                <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 shadow-sm">
-                  {getIcon(notif.type)}
+          notifications.map((notif) => {
+            let linkTo = '#';
+
+            if (notif.type === 'message') {
+              linkTo = `/chat/${notif.actor_id}`;
+            } else if (notif.type === 'connection_request' || notif.type === 'connection_accepted') {
+              linkTo = '/network';
+            } else if (notif.post_id) {
+              linkTo = `/post/${notif.post_id}`;
+            } else if (notif.type === 'like' && notif.reference_id) { // comment like -> redirect to post if possible, but we don't have post_id on comment_like notif easily without join, assume we redirect to network or we can just make it unclickable. Wait, comment trigger actually has post_id! Let's check trigger.
+              // Actually comment like trigger passes comment_id in reference_id.
+              linkTo = '#';
+            }
+
+            const content = (
+              <>
+                <div className="relative shrink-0">
+                  <img
+                    src={notif.actor?.avatar_url}
+                    alt="Avatar"
+                    className="w-12 h-12 rounded-full object-cover"
+                  />
+                  <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 shadow-sm">
+                    {getIcon(notif.type)}
+                  </div>
                 </div>
+                <div className="flex-1">
+                  <p className="text-sm text-gray-800">
+                    {getMessage(notif)}
+                  </p>
+                  <span className="text-xs text-gray-500 mt-1 block">
+                    {dayjs(notif.created_at).fromNow()}
+                  </span>
+                </div>
+              </>
+            );
+
+            if (linkTo !== '#') {
+               return (
+                  <Link
+                    to={linkTo}
+                    key={notif.id}
+                    className={`p-4 flex items-start gap-4 hover:bg-gray-50 transition-colors ${!notif.read ? 'bg-primary-50/30' : ''} cursor-pointer`}
+                  >
+                    {content}
+                  </Link>
+               );
+            }
+
+            return (
+              <div
+                key={notif.id}
+                className={`p-4 flex items-start gap-4 hover:bg-gray-50 transition-colors ${!notif.read ? 'bg-primary-50/30' : ''}`}
+              >
+                {content}
               </div>
-              <div className="flex-1">
-                <p className="text-sm text-gray-800">
-                  {getMessage(notif)}
-                </p>
-                <span className="text-xs text-gray-500 mt-1 block">
-                  {dayjs(notif.created_at).fromNow()}
-                </span>
-              </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>

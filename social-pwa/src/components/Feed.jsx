@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Image as ImageIcon, Send, Users, X, Loader2, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { compressImage } from '../lib/imageUtils';
 import Post from './Post';
 
 const POSTS_PER_PAGE = 10;
@@ -156,14 +157,15 @@ export default function Feed({ session }) {
     if (!file) return null;
 
     setUploadingImage(true);
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${session.user.id}-${Math.random()}.${fileExt}`;
-    const filePath = `${session.user.id}/${fileName}`;
-
     try {
+      const compressedFile = await compressImage(file);
+      const fileExt = compressedFile.name.split('.').pop();
+      const fileName = `${session.user.id}-${Math.random()}.${fileExt}`;
+      const filePath = `${session.user.id}/${fileName}`;
+
       const { error: uploadError } = await supabase.storage
         .from('post_images')
-        .upload(filePath, file);
+        .upload(filePath, compressedFile);
 
       if (uploadError) throw uploadError;
 
@@ -321,6 +323,25 @@ export default function Feed({ session }) {
       }
     } catch (error) {
       console.error('Erro ao curtir comentário:', error);
+    }
+  };
+
+  const handleEditPost = async (postId, newContent) => {
+    if (!newContent.trim()) return;
+    try {
+      // Optimistic Update
+      setPosts(currentPosts => currentPosts.map(p => p.id === postId ? { ...p, content: newContent } : p));
+
+      const { error } = await supabase
+        .from('posts')
+        .update({ content: newContent })
+        .eq('id', postId)
+        .eq('user_id', session.user.id);
+
+      if (error) throw error;
+    } catch (err) {
+      console.error("Erro ao editar post", err);
+      alert("Erro ao editar post.");
     }
   };
 
@@ -540,6 +561,7 @@ export default function Feed({ session }) {
                   onCommentLike={handleCommentLike}
                   onCommentEdit={handleCommentEdit}
                   onCommentDelete={handleCommentDelete}
+                  onEdit={handleEditPost}
                 />
               </div>
             );

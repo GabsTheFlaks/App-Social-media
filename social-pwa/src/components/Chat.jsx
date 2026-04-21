@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
+import { compressImage } from '../lib/imageUtils';
 import { Send, ArrowLeft, Loader2, MessageSquare, Image as ImageIcon, X } from 'lucide-react';
+import { useOnlineUsers } from './OnlinePresence';
 import dayjs from 'dayjs';
 
 export default function Chat({ session, onBack, selectedUser }) {
@@ -13,6 +15,8 @@ export default function Chat({ session, onBack, selectedUser }) {
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const channelRef = useRef(null);
+  const onlineUsers = useOnlineUsers(session);
+  const isOnline = onlineUsers.has(selectedUser.id);
 
   const fetchMessages = async () => {
     try {
@@ -41,20 +45,15 @@ export default function Chat({ session, onBack, selectedUser }) {
   useEffect(() => {
     fetchMessages();
 
-    // Cria um ID de canal único para esta conversa (os IDs precisam estar em ordem alfabética para ser o mesmo para ambos)
     const sortedIds = [session.user.id, selectedUser.id].sort();
-    const channelId = `chat-${sortedIds[0]}-${sortedIds[1]}`;
 
-    let channel = supabase.getChannels().find(c => c.topic === `realtime:${channelId}`);
+    // Canal exclusivo para DADOS (Novas Mensagens)
+    const dbChannelId = `chat-db-${sortedIds[0]}-${sortedIds[1]}`;
+    let dbChannel = supabase.getChannels().find(c => c.topic === `realtime:${dbChannelId}`);
 
-    if (!channel) {
-      channel = supabase.channel(channelId, {
-        config: { presence: { key: session.user.id } }
-      });
-
-      channelRef.current = channel;
-
-      channel.on('postgres_changes', {
+    if (!dbChannel) {
+      dbChannel = supabase.channel(dbChannelId);
+      dbChannel.on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
         table: 'messages'
@@ -77,10 +76,23 @@ export default function Chat({ session, onBack, selectedUser }) {
           });
           scrollToBottom();
         }
-      })
-      .on('presence', { event: 'sync' }, () => {
-        const state = channel.presenceState();
-        // Check if the remote user is typing
+      });
+      dbChannel.subscribe();
+    }
+
+    // Canal exclusivo para PRESENÇA (Digitando)
+    const presenceChannelId = `chat-presence-${sortedIds[0]}-${sortedIds[1]}`;
+    let presenceChannel = supabase.getChannels().find(c => c.topic === `realtime:${presenceChannelId}`);
+
+    if (!presenceChannel) {
+      presenceChannel = supabase.channel(presenceChannelId, {
+        config: { presence: { key: session.user.id } }
+      });
+
+      channelRef.current = presenceChannel;
+
+      presenceChannel.on('presence', { event: 'sync' }, () => {
+        const state = presenceChannel.presenceState();
         let typing = false;
         for (const [key, presences] of Object.entries(state)) {
           if (key === selectedUser.id && presences[0]?.typing) {
@@ -90,15 +102,16 @@ export default function Chat({ session, onBack, selectedUser }) {
         setIsTyping(typing);
       });
 
-      channel.subscribe(async (status) => {
+      presenceChannel.subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
-          await channel.track({ typing: false });
+          await presenceChannel.track({ typing: false });
         }
       });
     }
 
     return () => {
-      if (channel) supabase.removeChannel(channel);
+      if (dbChannel) supabase.removeChannel(dbChannel);
+      if (presenceChannel) supabase.removeChannel(presenceChannel);
     };
   }, [session.user.id, selectedUser.id]);
 
@@ -129,14 +142,15 @@ export default function Chat({ session, onBack, selectedUser }) {
 
       setUploadingImage(true);
       const file = e.target.files[0];
-      const fileExt = file.name.split('.').pop();
+      const compressedFile = await compressImage(file);
+      const fileExt = compressedFile.name.split('.').pop();
       const fileName = `${session.user.id}-${Math.random()}.${fileExt}`;
       const filePath = `chat/${fileName}`;
 
       // Upload no Storage
       const { error: uploadError } = await supabase.storage
         .from('post_images')
-        .upload(filePath, file);
+        .upload(filePath, compressedFile);
 
       if (uploadError) throw uploadError;
 
@@ -209,10 +223,17 @@ export default function Chat({ session, onBack, selectedUser }) {
         <button onClick={onBack} className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-full">
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <img src={selectedUser.avatar_url} alt="Avatar" className="w-10 h-10 rounded-full object-cover" />
+        <div className="relative">
+          <img src={selectedUser.avatar_url} alt="Avatar" className="w-10 h-10 rounded-full object-cover" />
+          {isOnline && (
+            <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white"></div>
+          )}
+        </div>
         <div>
           <h3 className="font-bold text-gray-900 text-sm leading-tight">{selectedUser.full_name}</h3>
-          <span className="text-xs text-gray-500">{selectedUser.role}</span>
+          <span className="text-xs text-gray-500">
+            {isTyping ? <span className="text-primary-600 italic">digitando...</span> : (isOnline ? 'Online agora' : selectedUser.role)}
+          </span>
         </div>
       </div>
 

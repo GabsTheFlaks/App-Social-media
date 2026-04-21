@@ -18,10 +18,30 @@ export default function Post({
   onImageClick,
   onCommentLike,
   onCommentDelete,
-  onCommentEdit
+  onCommentEdit,
+  onEdit
 }) {
   const [editingCommentId, setEditingCommentId] = useState(null);
   const [editCommentText, setEditCommentText] = useState('');
+
+  const [isEditingPost, setIsEditingPost] = useState(false);
+  const [editPostText, setEditPostText] = useState(post.content);
+
+  const startEditPost = () => {
+    setIsEditingPost(true);
+    setEditPostText(post.content);
+  };
+
+  const cancelEditPost = () => {
+    setIsEditingPost(false);
+    setEditPostText(post.content);
+  };
+
+  const submitEditPost = () => {
+    if (!editPostText.trim()) return;
+    onEdit(post.id, editPostText.trim());
+    setIsEditingPost(false);
+  };
 
   const startEditComment = (comment) => {
     setEditingCommentId(comment.id);
@@ -76,24 +96,59 @@ export default function Post({
             </div>
           </div>
         </Link>
-        {post.user_id === session.user.id && (
-          <button
-            onClick={() => onDelete(post.id)}
-            className="text-gray-400 hover:text-red-500 p-1"
-            title="Excluir"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
+        {post.user_id === session.user.id && !post.is_repost && !isEditingPost && (
+          <div className="flex items-center gap-1">
+            <button
+              onClick={startEditPost}
+              className="text-gray-400 hover:text-blue-500 p-1 transition"
+              title="Editar"
+            >
+              <Edit2 className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => onDelete(post.id)}
+              className="text-gray-400 hover:text-red-500 p-1 transition"
+              title="Excluir"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
         )}
       </div>
 
       <div className="mb-4">
-        <p className="text-gray-800 text-sm md:text-base whitespace-pre-wrap leading-relaxed">
-          {post.is_repost ? post.original?.content : post.content}
-        </p>
+        {isEditingPost ? (
+          <div className="space-y-2">
+            <textarea
+              value={editPostText}
+              onChange={(e) => setEditPostText(e.target.value)}
+              className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-primary-500 outline-none resize-none min-h-[80px]"
+              autoFocus
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={cancelEditPost}
+                className="px-4 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-full font-medium transition"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={submitEditPost}
+                disabled={!editPostText.trim() || editPostText === post.content}
+                className="px-4 py-1.5 text-sm bg-primary-600 text-white rounded-full font-medium hover:bg-primary-700 disabled:opacity-50 transition"
+              >
+                Salvar
+              </button>
+            </div>
+          </div>
+        ) : (
+          <p className="text-gray-800 text-sm md:text-base whitespace-pre-wrap leading-relaxed">
+            {post.is_repost ? post.original?.content : post.content}
+          </p>
+        )}
 
         {/* Se nao tem imagem mas tem link, mostra o preview do link */}
-        {!post.image_url && (!post.is_repost || !post.original?.image_url) && firstUrl && (
+        {!post.image_url && (!post.is_repost || !post.original?.image_url) && firstUrl && !isEditingPost && (
            <LinkPreview url={firstUrl} />
         )}
       </div>
