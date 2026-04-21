@@ -87,9 +87,9 @@ export default function Feed({ session }) {
 
       const formattedPosts = filteredPosts.map((post) => ({
         ...post,
-        isLiked: post.likes.some((like) => like.user_id === session.user.id),
-        isSaved: post.saved_posts?.some((saved) => saved.user_id === session.user.id),
-        likesCount: post.likes.length,
+        isLiked: post.likes?.some((like) => like.user_id === session.user.id) || false,
+        isSaved: post.saved_posts?.some((saved) => saved.user_id === session.user.id) || false,
+        likesCount: post.likes?.length || 0,
         commentsCount: post.comments?.length || 0,
         showComments: false,
         newComment: ''

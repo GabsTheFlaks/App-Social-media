@@ -34,9 +34,9 @@ export default function SinglePost({ session }) {
 
         const formattedPost = {
           ...data,
-          isLiked: data.likes.some((like) => like.user_id === session.user.id),
-          isSaved: data.saved_posts?.some((saved) => saved.user_id === session.user.id),
-          likesCount: data.likes.length,
+          isLiked: data.likes?.some((like) => like.user_id === session.user.id) || false,
+          isSaved: data.saved_posts?.some((saved) => saved.user_id === session.user.id) || false,
+          likesCount: data.likes?.length || 0,
           commentsCount: data.comments?.length || 0,
           showComments: true, // Auto open comments on single view
           newComment: ''
