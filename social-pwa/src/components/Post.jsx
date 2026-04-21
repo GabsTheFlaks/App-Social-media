@@ -142,72 +142,24 @@ export default function Post({
             </div>
           </div>
         </Link>
-        <div className="relative">
-          <button
-            onClick={() => setShowMenu(!showMenu)}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1 transition rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
-          >
-            <MoreVertical className="w-5 h-5" />
-          </button>
-
-          {showMenu && (
-            <>
-              <div
-                className="fixed inset-0 z-10"
-                onClick={() => setShowMenu(false)}
-              ></div>
-              <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-100 dark:border-gray-700 z-20 py-1">
-                {post.user_id === session.user.id && !post.is_repost && !isEditingPost && (
-                  <>
-                    <button
-                      onClick={() => { startEditPost(); setShowMenu(false); }}
-                      className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
-                    >
-                      <Edit2 className="w-4 h-4" /> Editar
-                    </button>
-                    <button
-                      onClick={() => { onDelete(post.id); setShowMenu(false); }}
-                      className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"
-                    >
-                      <Trash2 className="w-4 h-4" /> Excluir
-                    </button>
-                  </>
-                )}
-                {onSave && (
-                  <button
-                    onClick={() => { onSave(post.id, post.isSaved); setShowMenu(false); }}
-                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
-                  >
-                    <Bookmark className={clsx("w-4 h-4", post.isSaved && "fill-current text-primary-600")} />
-                    {post.isSaved ? 'Remover dos Salvos' : 'Salvar Publicação'}
-                  </button>
-                )}
-
-                {post.user_id !== session.user.id && onUnfollow && (
-                  <button
-                    onClick={() => { onUnfollow(post.user_id); setShowMenu(false); }}
-                    className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"
-                  >
-                    <UserMinus className="w-4 h-4" /> Deixar de Seguir
-                  </button>
-                )}
-
-                <button
-                  onClick={handleNativeShare}
-                  className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
-                >
-                  <Share2 className="w-4 h-4" /> Compartilhar Externo
-                </button>
-                <button
-                  onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/post/${post.id}`); alert('Link copiado!'); setShowMenu(false); }}
-                  className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
-                >
-                  <LinkIcon className="w-4 h-4" /> Copiar Link
-                </button>
-              </div>
-            </>
-          )}
-        </div>
+        {post.user_id === session.user.id && !isEditingPost && (
+          <div className="flex items-center gap-1">
+            <button
+              onClick={startEditPost}
+              className="text-gray-400 hover:text-blue-500 p-1 transition"
+              title="Editar"
+            >
+              <Edit2 className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => onDelete(post.id)}
+              className="text-gray-400 hover:text-red-500 p-1 transition"
+              title="Excluir"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="mb-4">
