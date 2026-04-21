@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Heart, MessageCircle, Share2, Send, Trash2, Globe, Users, Repeat2, Edit2, Check, X } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Send, Trash2, Globe, Users, Repeat2, Edit2, Check, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import clsx from 'clsx';
 import { Link } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -68,6 +68,23 @@ export default function Post({
 
   const urls = extractUrls(post.is_repost ? post.original?.content : post.content);
   const firstUrl = urls.length > 0 ? urls[0] : null;
+
+  // Lógica do Carrossel de Imagens
+  const postImages = post.is_repost
+    ? (post.original?.image_urls || (post.original?.image_url ? [post.original.image_url] : []))
+    : (post.image_urls || (post.image_url ? [post.image_url] : []));
+
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  const nextImage = (e) => {
+    e.stopPropagation();
+    setCurrentImageIndex((prev) => (prev + 1) % postImages.length);
+  };
+
+  const prevImage = (e) => {
+    e.stopPropagation();
+    setCurrentImageIndex((prev) => (prev - 1 + postImages.length) % postImages.length);
+  };
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 transition-all">
@@ -148,21 +165,51 @@ export default function Post({
         )}
 
         {/* Se nao tem imagem mas tem link, mostra o preview do link */}
-        {!post.image_url && (!post.is_repost || !post.original?.image_url) && firstUrl && !isEditingPost && (
+        {postImages.length === 0 && firstUrl && !isEditingPost && (
            <LinkPreview url={firstUrl} />
         )}
       </div>
 
-      {(post.image_url || (post.is_repost && post.original?.image_url)) && (
-        <div
-          className="mb-4 rounded-xl overflow-hidden bg-gray-100 cursor-pointer"
-          onClick={() => onImageClick(post.is_repost ? post.original?.image_url : post.image_url)}
-        >
-          <img
-            src={post.is_repost ? post.original?.image_url : post.image_url}
-            alt="Post attachment"
-            className="w-full max-h-96 object-contain hover:scale-[1.02] transition-transform duration-300"
-          />
+      {postImages.length > 0 && (
+        <div className="mb-4 relative rounded-xl overflow-hidden bg-gray-100 group">
+          <div
+            className="cursor-pointer"
+            onClick={() => onImageClick(postImages[currentImageIndex])}
+          >
+            <img
+              src={postImages[currentImageIndex]}
+              alt="Post attachment"
+              className="w-full max-h-96 object-contain hover:scale-[1.02] transition-transform duration-300"
+            />
+          </div>
+
+          {postImages.length > 1 && (
+            <>
+              {/* Botões do Carrossel */}
+              <button
+                onClick={prevImage}
+                className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition hover:bg-black/70"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <button
+                onClick={nextImage}
+                className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition hover:bg-black/70"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+
+              {/* Indicadores (Bolinhas) */}
+              <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5">
+                {postImages.map((_, idx) => (
+                  <div
+                    key={idx}
+                    className={`h-1.5 rounded-full transition-all ${idx === currentImageIndex ? 'w-4 bg-white' : 'w-1.5 bg-white/50'}`}
+                  />
+                ))}
+              </div>
+            </>
+          )}
         </div>
       )}
 

@@ -22,7 +22,7 @@ export default function SinglePost({ session }) {
             likes (user_id),
             comments (*, profiles (full_name, avatar_url), comment_likes (user_id)),
             original:original_post_id (
-              id, content, image_url, created_at,
+              id, content, image_url, image_urls, created_at,
               profiles (full_name, avatar_url)
             )
           `)

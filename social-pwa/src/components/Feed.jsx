@@ -17,7 +17,7 @@ export default function Feed({ session }) {
   const [posting, setPosting] = useState(false);
   const [profile, setProfile] = useState(null);
   const [uploadingImage, setUploadingImage] = useState(false);
-  const [selectedImage, setSelectedImage] = useState(null);
+  const [selectedImages, setSelectedImages] = useState([]);
   const [visibility, setVisibility] = useState('public');
   const [lightboxImage, setLightboxImage] = useState(null);
 
@@ -55,7 +55,7 @@ export default function Feed({ session }) {
           likes (user_id),
           comments (*, profiles (full_name, avatar_url), comment_likes (user_id)),
           original:original_post_id (
-            id, content, image_url, created_at,
+            id, content, image_url, image_urls, created_at,
             profiles (full_name, avatar_url)
           )
         `)
@@ -156,7 +156,6 @@ export default function Feed({ session }) {
   const handleImageUpload = async (file) => {
     if (!file) return null;
 
-    setUploadingImage(true);
     try {
       const compressedFile = await compressImage(file);
       const fileExt = compressedFile.name.split('.').pop();
@@ -176,44 +175,69 @@ export default function Feed({ session }) {
       return publicUrlData.publicUrl;
     } catch (error) {
       console.error('Erro no upload:', error);
-      alert('Erro ao fazer upload da imagem.');
       return null;
-    } finally {
-      setUploadingImage(false);
     }
   };
 
   const handlePost = async (e) => {
     e.preventDefault();
-    if (!newPost.trim() && !selectedImage) return;
+    if (!newPost.trim() && selectedImages.length === 0) return;
 
     setPosting(true);
+    setUploadingImage(selectedImages.length > 0);
 
     try {
-      let imageUrl = null;
-      if (selectedImage) {
-        imageUrl = await handleImageUpload(selectedImage);
+      // Upload images sequentially to not overwhelm browser/free tier
+      const validUrls = [];
+      for (const img of selectedImages) {
+         const url = await handleImageUpload(img);
+         if (url) validUrls.push(url);
       }
+
+      if (selectedImages.length > 0 && validUrls.length === 0) {
+        throw new Error('Falha no upload das imagens.');
+      }
+
+      const primeiraImagem = validUrls.length > 0 ? validUrls[0] : null;
 
       const { error } = await supabase.from('posts').insert([
         {
           user_id: session.user.id,
           content: newPost.trim() || ' ',
-          image_url: imageUrl,
+          image_url: primeiraImagem,
+          image_urls: validUrls.length > 0 ? validUrls : null,
           visibility: visibility
         },
       ]);
 
       if (error) throw error;
+
       setNewPost('');
-      setSelectedImage(null);
+      setSelectedImages([]);
       fetchPosts(0); // Volta pro topo
     } catch (error) {
       console.error('Erro ao postar:', error);
-      alert('Ocorreu um erro ao criar a publicação.');
+      alert('Ocorreu um erro ao criar a publicação. ' + error.message);
     } finally {
       setPosting(false);
+      setUploadingImage(false);
     }
+  };
+
+  const handleImageSelection = (e) => {
+    if (!e.target.files) return;
+
+    const newFiles = Array.from(e.target.files);
+    if (selectedImages.length + newFiles.length > 5) {
+      alert('Você pode selecionar no máximo 5 imagens por postagem.');
+      return;
+    }
+
+    setSelectedImages(prev => [...prev, ...newFiles]);
+  };
+
+  const removeSelectedImage = (indexToRemove) => {
+    setSelectedImages(prev => prev.filter((_, index) => index !== indexToRemove));
   };
 
   const handleLike = async (postId, isLiked) => {
@@ -462,20 +486,24 @@ export default function Feed({ session }) {
                 rows="2"
               />
 
-              {selectedImage && (
-                <div className="relative inline-block mt-2">
-                  <img
-                    src={URL.createObjectURL(selectedImage)}
-                    alt="Preview"
-                    className="max-h-64 rounded-lg border border-gray-200 object-contain"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setSelectedImage(null)}
-                    className="absolute top-2 right-2 bg-black/60 text-white p-1 rounded-full hover:bg-black/80"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+              {selectedImages.length > 0 && (
+                <div className="flex gap-2 overflow-x-auto py-2">
+                  {selectedImages.map((img, index) => (
+                    <div key={index} className="relative inline-block flex-shrink-0">
+                      <img
+                        src={URL.createObjectURL(img)}
+                        alt="Preview"
+                        className="h-24 w-24 object-cover rounded-lg border border-gray-200"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeSelectedImage(index)}
+                        className="absolute top-1 right-1 bg-black/60 text-white p-1 rounded-full hover:bg-black/80"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
                 </div>
               )}
 
@@ -487,12 +515,10 @@ export default function Feed({ session }) {
                     <input
                       type="file"
                       accept="image/*"
+                      multiple
                       className="hidden"
-                      onChange={(e) => {
-                        if (e.target.files && e.target.files[0]) {
-                          setSelectedImage(e.target.files[0]);
-                        }
-                      }}
+                      onChange={handleImageSelection}
+                      disabled={selectedImages.length >= 5}
                     />
                   </label>
 
@@ -508,7 +534,7 @@ export default function Feed({ session }) {
 
                 <button
                   type="submit"
-                  disabled={(!newPost.trim() && !selectedImage) || posting || uploadingImage}
+                  disabled={(!newPost.trim() && selectedImages.length === 0) || posting || uploadingImage}
                   className="bg-primary-600 text-white px-5 py-2 rounded-full font-medium text-sm hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   {(posting || uploadingImage) ? 'Publicando...' : (
