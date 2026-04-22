@@ -69,3 +69,13 @@ O Supabase nunca saberá o nome original "sujo" do arquivo, e não guardará o a
 *   `drive_link`: A URL gerada a partir do `File ID` para que o aluno visualize o arquivo embutido ou baixe.
 
 Para o aluno, a experiência final é limpa: ele clica em "Apostila" e o material abre instantaneamente.
+
+---
+
+## 4. Estratégia de Desenvolvimento e Reaproveitamento de Código
+
+Para acelerar o desenvolvimento e poupar esforço em funcionalidades que já foram resolvidas anteriormente:
+
+*   **Repositório de Origem (Python/React):** O usuário possui um projeto no GitHub que serviu como base conceitual (o que explica as menções originais a FastAPI e SQLite).
+*   **Diretriz para o Jules:** É altamente recomendado acessar, analisar e (se instruído pelo usuário) **clonar ou referenciar** o código desse repositório original. Isso servirá como excelente contexto para entender a lógica de negócios, reaproveitar a estrutura de componentes React já existentes (como a UI base do Classroom) e adaptar soluções pré-prontas (como a lógica exata de integração com a API do Google Drive) para a nova infraestrutura do Supabase.
+*   **Foco no que falta:** Ao invés de reinventar a roda, utilize o código legado como ponte, permitindo focar a energia e o tempo nas partes que o projeto antigo não possui ou na migração/refatoração para as novas tecnologias (como as regras de RLS do Supabase e o novo layout final).
