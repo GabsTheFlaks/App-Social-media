@@ -12,6 +12,8 @@ export default function Chat({ session, onBack, selectedUser }) {
   const [isTyping, setIsTyping] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [lightboxImage, setLightboxImage] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Audio Recording State
   const [isRecording, setIsRecording] = useState(false);
@@ -27,6 +29,36 @@ export default function Chat({ session, onBack, selectedUser }) {
   const onlineUsers = useOnlineUsers(session);
   const isOnline = onlineUsers.has(selectedUser.id);
 
+
+  const handleDeleteChat = async () => {
+    setIsDeleting(true);
+    try {
+      // Atualizar todas as mensagens onde sou o sender
+      await supabase
+        .from('messages')
+        .update({ deleted_by_sender: true })
+        .eq('sender_id', session.user.id)
+        .eq('receiver_id', selectedUser.id);
+
+      // Atualizar todas as mensagens onde sou o receiver
+      await supabase
+        .from('messages')
+        .update({ deleted_by_receiver: true })
+        .eq('receiver_id', session.user.id)
+        .eq('sender_id', selectedUser.id);
+
+      // Limpar as mensagens locais e voltar para a lista
+      setMessages([]);
+      setShowDeleteModal(false);
+      if (onBack) onBack();
+    } catch (err) {
+      console.error('Erro ao apagar chat', err);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+
   const fetchMessages = async () => {
     try {
       const { data, error } = await supabase
@@ -34,6 +66,18 @@ export default function Chat({ session, onBack, selectedUser }) {
         .select('*')
         .or(`and(sender_id.eq.${session.user.id},receiver_id.eq.${selectedUser.id}),and(sender_id.eq.${selectedUser.id},receiver_id.eq.${session.user.id})`)
         .order('created_at', { ascending: true });
+
+      if (!error && data) {
+        // Filtrar mensagens deletadas da nossa perspectiva
+        for (let i = data.length - 1; i >= 0; i--) {
+          const msg = data[i];
+          if (msg.sender_id === session.user.id && msg.deleted_by_sender) {
+            data.splice(i, 1);
+          } else if (msg.receiver_id === session.user.id && msg.deleted_by_receiver) {
+            data.splice(i, 1);
+          }
+        }
+      }
 
       if (error) throw error;
       setMessages(data || []);
@@ -339,12 +383,19 @@ export default function Chat({ session, onBack, selectedUser }) {
             <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white"></div>
           )}
         </div>
-        <div>
+        <div className="flex-1">
           <h3 className="font-bold text-gray-900 dark:text-gray-100 text-sm leading-tight">{selectedUser.full_name}</h3>
           <span className="text-xs text-gray-500 dark:text-gray-400">
             {isTyping ? <span className="text-primary-600 italic">digitando...</span> : (isOnline ? 'Online agora' : selectedUser.role)}
           </span>
         </div>
+        <button
+          onClick={() => setShowDeleteModal(true)}
+          className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-colors"
+          title="Apagar Conversa"
+        >
+          <Trash2 className="w-5 h-5" />
+        </button>
       </div>
 
       {/* Messages Area */}
@@ -494,6 +545,34 @@ export default function Chat({ session, onBack, selectedUser }) {
           />
         </div>
       )}
+
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl max-w-sm w-full p-6 shadow-xl">
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Apagar conversa?</h3>
+            <p className="text-gray-600 dark:text-gray-300 mb-6">
+              Esta ação apagará todo o histórico de mensagens apenas para você. O outro usuário ainda poderá ver as mensagens.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors font-medium"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDeleteChat}
+                disabled={isDeleting}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors font-medium flex items-center gap-2"
+              >
+                {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                {isDeleting ? 'Apagando...' : 'Apagar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
