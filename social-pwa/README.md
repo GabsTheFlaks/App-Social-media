@@ -23,14 +23,6 @@ O **Study Platform PWA** evoluiu de uma rede social genérica para uma plataform
 
 A arquitetura foi modernizada para utilizar um backend **100% Supabase** (substituindo FastAPI/SQLite), garantindo sincronização em tempo real e maior segurança.
 
-### 📸 Telas (Screenshots)
-
-> *(Adicione os prints da tela aqui / Add your screenshots here)*
->
-> `![Dashboard](./docs/dashboard.png)`
-> `![Chat](./docs/chat.png)`
-> `![Mobile View](./docs/mobile.png)`
-
 ### 🏗 Arquitetura
 - **Frontend (Cliente):**
   - **React 19 & Vite:** Performance extrema e build ultrarrápido.
@@ -89,14 +81,6 @@ A arquitetura foi modernizada para utilizar um backend **100% Supabase** (substi
 The **Study Platform PWA** evolved from a generic social network into a collaborative learning and study management platform. Featuring a productivity-focused design, mobile-first responsiveness, and a Google Classroom-style dashboard layout, the app provides a seamless experience both in the browser and as an installed Progressive Web App (PWA).
 
 The architecture was entirely migrated to a **100% Supabase** backend (abandoning older FastAPI/SQLite tech), ensuring real-time synchronization and robust security.
-
-### 📸 Screenshots
-
-> *(Add your screenshots here)*
->
-> `![Dashboard Layout](./docs/dashboard-en.png)`
-> `![Realtime Chat](./docs/chat-en.png)`
-> `![PWA Mobile](./docs/mobile-en.png)`
 
 ### 🏗 Architecture
 - **Frontend (Client):**
