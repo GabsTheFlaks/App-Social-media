@@ -19,7 +19,7 @@ export default defineConfig({
         description: 'Uma nova rede social web híbrida',
         theme_color: '#ffffff',
         background_color: '#ffffff',
-        display: 'fullscreen',
+        display: 'standalone',
         start_url: '/',
         orientation: 'portrait',
         icons: [
@@ -32,6 +32,14 @@ export default defineConfig({
             src: 'icon-512x512.png',
             sizes: '512x512',
             type: 'image/png'
+          }
+        ]
+      },
+      workbox: {
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => url.href.includes('/rest/v1/'),
+            handler: 'StaleWhileRevalidate'
           }
         ]
       }
