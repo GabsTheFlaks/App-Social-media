@@ -1,7 +1,8 @@
+import toast from 'react-hot-toast';
 import { useState, useEffect } from 'react';
 import { Camera, MapPin, Briefcase, Mail, X, MessageSquare, Bookmark } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { compressImage } from '../lib/imageUtils';
+import { useStorageUpload } from '../hooks/useStorageUpload';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Settings } from 'lucide-react';
 import Post from './Post';
@@ -42,8 +43,8 @@ export default function Profile({ session }) {
   const [savedPosts, setSavedPosts] = useState([]);
   const [loadingSaved, setLoadingSaved] = useState(false);
 
-  const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const [uploadingCover, setUploadingCover] = useState(false);
+  const { upload: uploadCover, uploading: uploadingCover } = useStorageUpload({ bucket: 'covers', pathPrefix: session.user.id });
+  const { upload: uploadAvatar, uploading: uploadingAvatar } = useStorageUpload({ bucket: 'avatars', pathPrefix: session.user.id });
 
   const fetchSavedPosts = async () => {
     setLoadingSaved(true);
@@ -212,7 +213,7 @@ export default function Profile({ session }) {
       if (error) throw error;
     } catch (err) {
       console.error(err);
-      alert("Erro ao editar post.");
+      toast("Erro ao editar post.");
     }
   };
 
@@ -376,7 +377,7 @@ export default function Profile({ session }) {
         original_post_id: originalId
       }]);
       if (error) throw error;
-      alert('Compartilhado com sucesso!');
+      toast('Compartilhado com sucesso!');
     } catch (err) {
       console.error(err);
     }
@@ -395,7 +396,7 @@ export default function Profile({ session }) {
       setEditing(false);
     } catch(err) {
       console.error(err);
-      alert('Erro ao salvar perfil');
+      toast('Erro ao salvar perfil');
     }
   };
 
@@ -403,24 +404,7 @@ export default function Profile({ session }) {
     try {
       if (!e.target.files || e.target.files.length === 0) return;
 
-      setUploadingCover(true);
-      const file = e.target.files[0];
-      const compressedFile = await compressImage(file);
-      const fileExt = compressedFile.name.split('.').pop();
-      const fileName = `${session.user.id}-${Math.random()}.${fileExt}`;
-      const filePath = `${session.user.id}/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('covers')
-        .upload(filePath, compressedFile);
-
-      if (uploadError) throw uploadError;
-
-      const { data: publicUrlData } = supabase.storage
-        .from('covers')
-        .getPublicUrl(filePath);
-
-      const coverUrl = publicUrlData.publicUrl;
+      const coverUrl = await uploadCover(e.target.files[0]);
 
       const { error: updateError } = await supabase
         .from('profiles')
@@ -432,9 +416,11 @@ export default function Profile({ session }) {
       setProfile(prev => ({ ...prev, cover_url: coverUrl }));
     } catch (error) {
       console.error('Erro ao atualizar foto de capa', error);
-      alert('Erro ao fazer upload da capa.');
-    } finally {
-      setUploadingCover(false);
+
+
+
+      toast('Erro ao fazer upload da capa.');
+
     }
   };
 
@@ -442,26 +428,7 @@ export default function Profile({ session }) {
     try {
       if (!e.target.files || e.target.files.length === 0) return;
 
-      setUploadingAvatar(true);
-      const file = e.target.files[0];
-      const compressedFile = await compressImage(file);
-      const fileExt = compressedFile.name.split('.').pop();
-      const fileName = `${session.user.id}-${Math.random()}.${fileExt}`;
-      const filePath = `${session.user.id}/${fileName}`;
-
-      // Upload no Storage
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, compressedFile);
-
-      if (uploadError) throw uploadError;
-
-      // Pega URL Publica
-      const { data: publicUrlData } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(filePath);
-
-      const avatarUrl = publicUrlData.publicUrl;
+      const avatarUrl = await uploadAvatar(e.target.files[0]);
 
       // Atualiza o Perfil
       const { error: updateError } = await supabase
@@ -472,12 +439,14 @@ export default function Profile({ session }) {
       if (updateError) throw updateError;
 
       setProfile(prev => ({ ...prev, avatar_url: avatarUrl }));
-      alert('Foto de perfil atualizada!');
+      toast('Foto de perfil atualizada!');
     } catch (error) {
       console.error('Erro ao atualizar foto', error);
-      alert('Erro ao fazer upload da imagem.');
-    } finally {
-      setUploadingAvatar(false);
+
+
+
+      toast('Erro ao fazer upload da imagem.');
+
     }
   };
 

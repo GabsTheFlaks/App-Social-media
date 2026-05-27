@@ -25,6 +25,6 @@ export const compressImage = async (file) => {
     });
   } catch (error) {
     console.error('Erro ao comprimir imagem:', error);
-    return file; // Se der erro, tenta subir a original mesmo
+    throw new Error('Falha ao comprimir imagem', { cause: error });
   }
 };

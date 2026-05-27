@@ -1,3 +1,4 @@
+import toast from 'react-hot-toast';
 import React, { useState } from 'react';
 import { Heart, MessageCircle, Share2, Send, Trash2, Globe, Users, Repeat2, Edit2, Check, X, ChevronLeft, ChevronRight, Bookmark, MoreVertical, Link as LinkIcon, UserMinus } from 'lucide-react';
 import clsx from 'clsx';
@@ -99,7 +100,7 @@ export default function Post({
       }
     } else {
       navigator.clipboard.writeText(postUrl);
-      alert('Link copiado para a área de transferência!');
+      toast('Link copiado para a área de transferência!');
     }
     setShowMenu(false);
   };
@@ -199,7 +200,7 @@ export default function Post({
                   <Share2 className="w-4 h-4" /> Compartilhar Externo
                 </button>
                 <button
-                  onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/post/${post.id}`); alert('Link copiado!'); setShowMenu(false); }}
+                  onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/post/${post.id}`); toast('Link copiado!'); setShowMenu(false); }}
                   className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
                 >
                   <LinkIcon className="w-4 h-4" /> Copiar Link

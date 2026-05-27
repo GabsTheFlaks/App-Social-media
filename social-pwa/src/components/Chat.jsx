@@ -1,6 +1,7 @@
+import toast from 'react-hot-toast';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { compressImage } from '../lib/imageUtils';
+import { useStorageUpload } from '../hooks/useStorageUpload';
 import { Send, ArrowLeft, Loader2, MessageSquare, Image as ImageIcon, X, Mic, StopCircle, Trash2 } from 'lucide-react';
 import { useOnlineUsers } from './OnlinePresence';
 import dayjs from 'dayjs';
@@ -10,7 +11,6 @@ export default function Chat({ session, onBack, selectedUser }) {
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [isTyping, setIsTyping] = useState(false);
-  const [uploadingImage, setUploadingImage] = useState(false);
   const [lightboxImage, setLightboxImage] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -28,6 +28,11 @@ export default function Chat({ session, onBack, selectedUser }) {
   const channelRef = useRef(null);
   const onlineUsers = useOnlineUsers(session);
   const isOnline = onlineUsers.has(selectedUser.id);
+
+  const { upload: uploadChatImage, uploading: uploadingImageHook } = useStorageUpload({ bucket: 'post_images', pathPrefix: 'chat' });
+  const { upload: uploadChatAudio, uploading: uploadingAudioHook } = useStorageUpload({ bucket: 'post_images', pathPrefix: 'chat-audio', allowAudio: true });
+
+  const uploadingImage = uploadingImageHook || uploadingAudioHook;
 
 
   const handleDeleteChat = async () => {
@@ -229,7 +234,7 @@ export default function Chat({ session, onBack, selectedUser }) {
 
     } catch (err) {
       console.error('Erro ao acessar microfone:', err);
-      alert('Não foi possível acessar o microfone. Verifique as permissões.');
+      toast('Não foi possível acessar o microfone. Verifique as permissões.');
     }
   };
 
@@ -256,21 +261,7 @@ export default function Chat({ session, onBack, selectedUser }) {
     if (!audioBlob || audioBlob.size === 0) return;
 
     try {
-      setUploadingImage(true); // Reusing uploading state for loader
-      const fileName = `${session.user.id}-${Math.random()}.webm`;
-      const filePath = `chat-audio/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('post_images')
-        .upload(filePath, audioBlob, { contentType: 'audio/webm' });
-
-      if (uploadError) throw uploadError;
-
-      const { data: publicUrlData } = supabase.storage
-        .from('post_images')
-        .getPublicUrl(filePath);
-
-      const audioUrl = publicUrlData.publicUrl;
+      const audioUrl = await uploadChatAudio(audioBlob);
 
       // O formato do link determinará como será renderizado. Enviaremos o link.
       const { error: msgError } = await supabase.from('messages').insert([{
@@ -283,9 +274,8 @@ export default function Chat({ session, onBack, selectedUser }) {
       scrollToBottom();
     } catch (error) {
       console.error('Erro ao enviar áudio', error);
-      alert('Erro ao enviar áudio.');
+      toast('Erro ao enviar áudio.');
     } finally {
-      setUploadingImage(false);
       setRecordingDuration(0);
     }
   };
@@ -294,26 +284,7 @@ export default function Chat({ session, onBack, selectedUser }) {
     try {
       if (!e.target.files || e.target.files.length === 0) return;
 
-      setUploadingImage(true);
-      const file = e.target.files[0];
-      const compressedFile = await compressImage(file);
-      const fileExt = compressedFile.name.split('.').pop();
-      const fileName = `${session.user.id}-${Math.random()}.${fileExt}`;
-      const filePath = `chat/${fileName}`;
-
-      // Upload no Storage
-      const { error: uploadError } = await supabase.storage
-        .from('post_images')
-        .upload(filePath, compressedFile);
-
-      if (uploadError) throw uploadError;
-
-      // Pega URL Publica
-      const { data: publicUrlData } = supabase.storage
-        .from('post_images')
-        .getPublicUrl(filePath);
-
-      const imageUrl = publicUrlData.publicUrl;
+      const imageUrl = await uploadChatImage(e.target.files[0]);
 
       // Envia a mensagem com a imagem (usamos content = ' ' para satisfazer not null caso exigido, ou url pura se for assim na tabela)
       const { error: msgError } = await supabase.from('messages').insert([{
@@ -326,9 +297,11 @@ export default function Chat({ session, onBack, selectedUser }) {
       scrollToBottom();
     } catch (error) {
       console.error('Erro ao enviar imagem', error);
-      alert('Erro ao fazer upload da imagem.');
-    } finally {
-      setUploadingImage(false);
+
+
+
+      toast('Erro ao fazer upload da imagem.');
+
     }
   };
 
@@ -366,7 +339,7 @@ export default function Chat({ session, onBack, selectedUser }) {
       }
     } catch (err) {
       console.error('Erro ao enviar mensagem:', err);
-      alert('Erro ao enviar mensagem. Tente novamente.');
+      toast('Erro ao enviar mensagem. Tente novamente.');
     }
   };
 
