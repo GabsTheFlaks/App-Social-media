@@ -1,3 +1,4 @@
+import toast from 'react-hot-toast';
 import { useState, useEffect } from 'react';
 import { Camera, MapPin, Briefcase, Mail, X, MessageSquare, Bookmark } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -212,7 +213,7 @@ export default function Profile({ session }) {
       if (error) throw error;
     } catch (err) {
       console.error(err);
-      alert("Erro ao editar post.");
+      toast("Erro ao editar post.");
     }
   };
 
@@ -376,7 +377,7 @@ export default function Profile({ session }) {
         original_post_id: originalId
       }]);
       if (error) throw error;
-      alert('Compartilhado com sucesso!');
+      toast('Compartilhado com sucesso!');
     } catch (err) {
       console.error(err);
     }
@@ -395,7 +396,7 @@ export default function Profile({ session }) {
       setEditing(false);
     } catch(err) {
       console.error(err);
-      alert('Erro ao salvar perfil');
+      toast('Erro ao salvar perfil');
     }
   };
 
@@ -415,7 +416,11 @@ export default function Profile({ session }) {
       setProfile(prev => ({ ...prev, cover_url: coverUrl }));
     } catch (error) {
       console.error('Erro ao atualizar foto de capa', error);
-      alert('Erro ao fazer upload da capa.');
+
+
+
+      toast('Erro ao fazer upload da capa.');
+
     }
   };
 
@@ -434,10 +439,14 @@ export default function Profile({ session }) {
       if (updateError) throw updateError;
 
       setProfile(prev => ({ ...prev, avatar_url: avatarUrl }));
-      alert('Foto de perfil atualizada!');
+      toast('Foto de perfil atualizada!');
     } catch (error) {
       console.error('Erro ao atualizar foto', error);
-      alert('Erro ao fazer upload da imagem.');
+
+
+
+      toast('Erro ao fazer upload da imagem.');
+
     }
   };
 

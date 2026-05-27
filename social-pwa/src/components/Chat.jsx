@@ -1,3 +1,4 @@
+import toast from 'react-hot-toast';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useStorageUpload } from '../hooks/useStorageUpload';
@@ -233,7 +234,7 @@ export default function Chat({ session, onBack, selectedUser }) {
 
     } catch (err) {
       console.error('Erro ao acessar microfone:', err);
-      alert('Não foi possível acessar o microfone. Verifique as permissões.');
+      toast('Não foi possível acessar o microfone. Verifique as permissões.');
     }
   };
 
@@ -273,7 +274,7 @@ export default function Chat({ session, onBack, selectedUser }) {
       scrollToBottom();
     } catch (error) {
       console.error('Erro ao enviar áudio', error);
-      alert('Erro ao enviar áudio.');
+      toast('Erro ao enviar áudio.');
     } finally {
       setRecordingDuration(0);
     }
@@ -296,7 +297,11 @@ export default function Chat({ session, onBack, selectedUser }) {
       scrollToBottom();
     } catch (error) {
       console.error('Erro ao enviar imagem', error);
-      alert('Erro ao fazer upload da imagem.');
+
+
+
+      toast('Erro ao fazer upload da imagem.');
+
     }
   };
 
@@ -334,7 +339,7 @@ export default function Chat({ session, onBack, selectedUser }) {
       }
     } catch (err) {
       console.error('Erro ao enviar mensagem:', err);
-      alert('Erro ao enviar mensagem. Tente novamente.');
+      toast('Erro ao enviar mensagem. Tente novamente.');
     }
   };
 

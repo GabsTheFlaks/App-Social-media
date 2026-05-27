@@ -1,3 +1,4 @@
+import toast from 'react-hot-toast';
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Loader2 } from 'lucide-react';
@@ -155,7 +156,7 @@ export default function SinglePost({ session }) {
     try {
       const originalId = postToRepost.is_repost ? postToRepost.original_post_id : postToRepost.id;
       await supabase.from('posts').insert([{ user_id: session.user.id, content: ' ', is_repost: true, original_post_id: originalId }]);
-      alert('Compartilhado com sucesso!');
+      toast('Compartilhado com sucesso!');
     } catch (err) { console.error(err); }
   };
 

@@ -1,3 +1,4 @@
+import toast from 'react-hot-toast';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Image as ImageIcon, Send, Users, X, Loader2, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -208,7 +209,7 @@ export default function Feed({ session }) {
       fetchPosts(0); // Volta pro topo
     } catch (error) {
       console.error('Erro ao postar:', error);
-      alert('Ocorreu um erro ao criar a publicação. ' + error.message);
+      toast('Ocorreu um erro ao criar a publicação. ' + error.message);
     } finally {
       setPosting(false);
       setUploadingImage(false);
@@ -220,7 +221,7 @@ export default function Feed({ session }) {
 
     const newFiles = Array.from(e.target.files);
     if (selectedImages.length + newFiles.length > 5) {
-      alert('Você pode selecionar no máximo 5 imagens por postagem.');
+      toast('Você pode selecionar no máximo 5 imagens por postagem.');
       return;
     }
 
@@ -371,7 +372,7 @@ export default function Feed({ session }) {
       if (error) throw error;
     } catch (err) {
       console.error("Erro ao editar post", err);
-      alert("Erro ao editar post.");
+      toast("Erro ao editar post.");
     }
   };
 
@@ -479,7 +480,7 @@ export default function Feed({ session }) {
       ]);
 
       if (error) throw error;
-      alert("Publicação compartilhada!");
+      toast("Publicação compartilhada!");
       fetchPosts(0);
     } catch(err) {
       console.error("Erro ao compartilhar", err);
