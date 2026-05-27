@@ -30,6 +30,52 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
 
+-- Trigger para impedir a atualização de colunas não autorizadas (ex: badges)
+-- Lança exceção se o usuário tentar alterar qualquer coluna além de:
+-- full_name, role, location, bio, avatar_url, cover_url
+create or replace function public.check_profile_update()
+returns trigger as $$
+begin
+  -- Verifica se alguma coluna não permitida foi alterada comparando com a versão antiga (OLD)
+
+  -- Se a coluna ID mudou:
+  if new.id is distinct from old.id then
+    raise exception 'Not allowed to update id';
+  end if;
+
+  -- Se a coluna created_at mudou:
+  if new.created_at is distinct from old.created_at then
+    raise exception 'Not allowed to update created_at';
+  end if;
+
+  -- A instrução exige que APENAS full_name, role, location, bio, avatar_url e cover_url possam ser alteradas.
+  -- Se as outras colunas mudaram, lançamos exceção.
+  -- Como o schema básico inicial não tem cover_url, mas pode ser adicionado em outras migrations,
+  -- vamos focar no que sabemos que EXISTE, e as demais são consideradas restritas.
+
+  -- Vamos converter NEW e OLD para JSONB e comparar chaves que não estão na "whitelist"
+  declare
+    _new_json jsonb := to_jsonb(new);
+    _old_json jsonb := to_jsonb(old);
+    _key text;
+    _allowed_keys text[] := array['full_name', 'role', 'location', 'bio', 'avatar_url', 'cover_url'];
+  begin
+    for _key in select jsonb_object_keys(_new_json) loop
+      -- Se a chave não estiver nas permitidas e o valor mudou
+      if not (_key = any(_allowed_keys)) and _new_json->>_key is distinct from _old_json->>_key then
+        raise exception 'Não é permitido alterar a coluna: %', _key;
+      end if;
+    end loop;
+  end;
+
+  return new;
+end;
+$$ language plpgsql security definer;
+
+create trigger on_profile_update
+  before update on public.profiles
+  for each row execute procedure public.check_profile_update();
+
 -- 2. Criar tabela de Posts
 create table public.posts (
   id uuid default gen_random_uuid() primary key,

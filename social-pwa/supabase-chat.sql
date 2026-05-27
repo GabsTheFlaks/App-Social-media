@@ -17,7 +17,18 @@ create policy "Usuários podem ver mensagens enviadas ou recebidas por eles"
 
 create policy "Usuários podem enviar mensagens"
   on public.messages for insert
-  with check (auth.uid() = sender_id);
+  with check (
+    auth.uid() = sender_id AND
+    exists (
+      select 1 from public.connections c
+      where c.status = 'accepted'
+      and (
+        (c.follower_id = sender_id and c.following_id = receiver_id)
+        or
+        (c.follower_id = receiver_id and c.following_id = sender_id)
+      )
+    )
+  );
 
 create policy "Usuários podem marcar como lido"
   on public.messages for update
