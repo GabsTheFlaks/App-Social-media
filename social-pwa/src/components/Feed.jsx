@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Image as ImageIcon, Send, Users, X, Loader2, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { compressImage } from '../lib/imageUtils';
+import { useStorageUpload } from '../hooks/useStorageUpload';
 import Post from './Post';
 
 const POSTS_PER_PAGE = 10;
@@ -155,26 +155,15 @@ export default function Feed({ session }) {
     };
   }, [session.user.id]);
 
+  const { upload: uploadPostImage } = useStorageUpload({
+    bucket: 'post_images',
+    pathPrefix: session.user.id
+  });
+
   const handleImageUpload = async (file) => {
     if (!file) return null;
-
     try {
-      const compressedFile = await compressImage(file);
-      const fileExt = compressedFile.name.split('.').pop();
-      const fileName = `${session.user.id}-${Math.random()}.${fileExt}`;
-      const filePath = `${session.user.id}/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('post_images')
-        .upload(filePath, compressedFile);
-
-      if (uploadError) throw uploadError;
-
-      const { data: publicUrlData } = supabase.storage
-        .from('post_images')
-        .getPublicUrl(filePath);
-
-      return publicUrlData.publicUrl;
+      return await uploadPostImage(file);
     } catch (error) {
       console.error('Erro no upload:', error);
       return null;
