@@ -7,11 +7,11 @@
   <img src="https://img.shields.io/badge/Google_Drive-4285F4?style=for-the-badge&logo=googledrive&logoColor=white" alt="Google Drive" />
 </div>
 
-<h1 align="center">Study Platform / PWA 🎓</h1>
+<h1 align="center">Academic Social Network / PWA 🎓</h1>
 
 <p align="center">
-  <b>A structured Study Platform inspired by Google Classroom, built as a Progressive Web App (PWA).</b><br>
-  <i>Uma Plataforma de Estudos estruturada inspirada no Google Classroom, construída como um PWA.</i>
+  <b>A modern Academic Social Network engineered as a Progressive Web App (PWA).</b><br>
+  <i>Uma Rede Social Acadêmica moderna desenvolvida como um PWA.</i>
 </p>
 
 ---
@@ -19,27 +19,28 @@
 ## 🇧🇷 Português
 
 ### 📖 Sobre o Projeto
-O **Study Platform PWA** evoluiu de uma rede social genérica para uma plataforma de aprendizado colaborativo e gerenciamento de estudos. Com um design focado na produtividade, ambiente responsivo "mobile-first" e layout de painel (dashboard) no estilo Google Classroom, o aplicativo oferece uma experiência fluida tanto no navegador quanto como um aplicativo instalado (PWA).
+O projeto **Academic Social Network** atua como um hub centralizado para a comunidade acadêmica. Ele permite que estudantes, pesquisadores e educadores se conectem, discutam ideias e construam um networking focado na área da educação. Com um design "mobile-first" e interface limpa, o aplicativo proporciona uma experiência acadêmica fluida, livre das distrações de redes sociais comuns, podendo ser acessado via navegador ou instalado como PWA em seu dispositivo móvel.
 
-A arquitetura foi modernizada para utilizar um backend **100% Supabase** (substituindo FastAPI/SQLite), garantindo sincronização em tempo real e maior segurança.
+A plataforma utiliza um backend Serverless **100% Supabase**, garantindo sincronização em tempo real, segurança via RLS (Row Level Security) e arquitetura moderna.
 
 ### 🏗 Arquitetura
 - **Frontend (Cliente):**
-  - **React 19 & Vite:** Performance extrema e build ultrarrápido.
-  - **Tailwind CSS v3:** Estilização utilitária focada em design corporativo/limpo (tons de azul/cinza, superfícies brancas).
-  - **PWA (Progressive Web App):** Suporte offline básico e instalação nativa via `vite-plugin-pwa`.
-- **Backend (BaaS):**
-  - **Supabase:** Substituição completa do backend tradicional. Utilizado para Autenticação, Banco de Dados (PostgreSQL), Storage (para imagens de posts e covers) e Realtime (Chat, Presence e notificações de digitação).
-- **Integração de Arquivos:**
-  - **Google Drive API:** Upload invisível e otimizado usando Service Account. O backend salva apenas os metadados e o `drive_link` no Supabase para reduzir custos de armazenamento.
+  - **React 19 & Vite:** Performance extrema e build ultrarrápido (configurado na porta fixa 5174).
+  - **Tailwind CSS v3:** Estilização utilitária para criar uma interface clean e focada na leitura (tons de azul e superfícies claras).
+  - **PWA (Progressive Web App):** Suporte offline e instalação nativa em mobile e desktop via `vite-plugin-pwa`.
+- **Backend (Supabase BaaS):**
+  - **Autenticação:** Login e gerenciamento de sessões com segurança embutida.
+  - **PostgreSQL:** Banco de dados relacional robusto (com policies rígidas de RLS).
+  - **Storage:** Armazenamento direto para imagens e capas de perfil nos *buckets* `post_images` e `covers`.
+  - **Realtime:** Chat 1-a-1 e rastreamento de Status Online global usando *Supabase Presence*.
 
 ### ✨ Principais Funcionalidades
-- **Dashboard de Estudos:** Layout limpo com barra superior (Navbar) e menu lateral para navegação.
-- **Feed e Posts:** Suporte a múltiplas imagens, links (com pré-visualização) e textos.
-- **Chat em Tempo Real:** Conversas 1-a-1 com indicadores de digitação (Supabase Presence) e gravação de mensagens de áudio (WebM).
-- **Gerenciamento de Arquivos:** Integração fluida para envio de materiais de estudo, armazenados via Google Drive.
-- **Notificações:** Alertas sobre curtidas, comentários e novas mensagens.
-- **Exclusão de Conta:** Rotina segura usando função PostgreSQL (`delete_own_account()`) para limpar dados completamente e evitar erros de referência no Auth do Supabase.
+- **Feed Acadêmico:** Compartilhamento de conhecimento com suporte a múltiplas imagens por publicação, texto, emojis e geração automática de pré-visualização de links (como artigos e vídeos do YouTube).
+- **Networking Escolar/Universitário:** Um sistema de "Conexões" para você seguir colegas e professores.
+- **Chat e Colaboração Direta:** Uma vez conectados, os usuários conversam em um **Chat em Tempo Real** equipado com status de digitação ("escrevendo...") e envio nativo de áudio (WebM).
+- **Engajamento Acadêmico:** Sistema de curtidas e comentários estruturado, com Atualizações Otimistas de Interface (UI Optimistic) para percepção de ação imediata.
+- **Notificações:** Alertas dedicados para novos seguidores, respostas e curtidas.
+- **Controle Total de Dados:** Exclusão completa e segura do perfil via função customizada PostgreSQL (`delete_own_account()`).
 
 ### 🚀 Como Rodar o Projeto (Local)
 
@@ -78,27 +79,28 @@ A arquitetura foi modernizada para utilizar um backend **100% Supabase** (substi
 ## 🇺🇸 English
 
 ### 📖 About the Project
-The **Study Platform PWA** evolved from a generic social network into a collaborative learning and study management platform. Featuring a productivity-focused design, mobile-first responsiveness, and a Google Classroom-style dashboard layout, the app provides a seamless experience both in the browser and as an installed Progressive Web App (PWA).
+The **Academic Social Network** operates as a centralized hub for the academic community. It allows students, researchers, and educators to connect, discuss ideas, and build a network focused entirely on education. Featuring a mobile-first design and a clean interface, the app provides a smooth, distraction-free academic experience compared to common social networks, accessible via browser or installed as a PWA on your mobile device.
 
-The architecture was entirely migrated to a **100% Supabase** backend (abandoning older FastAPI/SQLite tech), ensuring real-time synchronization and robust security.
+The platform utilizes a **100% Serverless Supabase** backend, guaranteeing real-time synchronization, rigorous Row Level Security (RLS) policies, and a modern architecture.
 
 ### 🏗 Architecture
 - **Frontend (Client):**
-  - **React 19 & Vite:** Extreme performance and ultra-fast builds.
-  - **Tailwind CSS v3:** Utility-first styling for a clean, corporate UI (blue/gray tones, white surfaces, soft shadows).
-  - **PWA:** Native installation and basic offline support via `vite-plugin-pwa`.
-- **Backend (BaaS):**
-  - **Supabase:** The sole backend solution. Handles Authentication, Database (PostgreSQL), Storage (for post images and profile covers), and Realtime features (Chat, Online Presence, and typing indicators).
-- **File Storage Integration:**
-  - **Google Drive API:** Invisible background uploads using a Service Account. Only metadata and the resulting `drive_link` are stored in Supabase to minimize platform costs.
+  - **React 19 & Vite:** Extreme performance and ultra-fast builds (configured on fixed port 5174).
+  - **Tailwind CSS v3:** Utility-first styling to create a clean, reading-focused UI (blue tones, white surfaces, soft shadows).
+  - **PWA:** Native installation across desktop and mobile, plus offline support via `vite-plugin-pwa`.
+- **Backend (Supabase BaaS):**
+  - **Authentication:** Integrated session management and secure logins.
+  - **PostgreSQL:** Relational database fortified with strict RLS policies.
+  - **Storage:** Dedicated buckets (`post_images` and `covers`) for handling avatar and post media.
+  - **Realtime:** 1-on-1 chat routing and global online status tracking powered by *Supabase Presence*.
 
 ### ✨ Key Features
-- **Study Dashboard:** Clean workspace layout with a top Navbar and a side navigation menu.
-- **Interactive Feed:** Rich posts supporting multiple images, link previews, and text.
-- **Real-Time Chat:** 1-on-1 messaging complete with typing indicators, online status tracking (via Supabase Presence), and native audio recording (WebM).
-- **File Management:** Seamless upload logic for study materials handled under the hood by Google Drive.
-- **Notifications:** Instantly stay updated on likes, comments, and new chat messages.
-- **Secure Account Deletion:** Custom secure PostgreSQL function (`delete_own_account()`) handling total data cleanup without breaking Supabase Auth constraints.
+- **Academic Feed:** Knowledge sharing with multiple-image uploads, text formatting, and automatic rich link previews (such as articles or YouTube videos).
+- **School/University Networking:** A "Connections" system to follow peers, professors, and researchers.
+- **Chat and Direct Collaboration:** Once connected, users can engage in **Real-time Chat** outfitted with typing indicators and native WebM audio recording.
+- **Academic Engagement:** Structured likes and comments system, providing instantaneous visual feedback driven by Optimistic UI updates.
+- **Notifications:** Dedicated alert page to keep track of new followers, replies, and likes.
+- **Full Data Control:** Secure and total account wipe enabled by a custom PostgreSQL function (`delete_own_account()`).
 
 ### 🚀 Getting Started (Local Development)
 
