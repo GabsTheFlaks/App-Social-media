@@ -1,3 +1,4 @@
+import toast from 'react-hot-toast';
 import { useState, useEffect } from 'react';
 import { UserPlus, Check, X, Clock, UserCheck, Search, MessageSquare, UserMinus } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -60,7 +61,7 @@ export default function Network({ session, onOpenChat }) {
       fetchData();
     } catch (error) {
       console.error(error);
-      alert('Erro ao enviar convite.');
+      toast('Erro ao enviar convite.');
     }
   };
 

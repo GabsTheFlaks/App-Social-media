@@ -1,8 +1,9 @@
+import toast from 'react-hot-toast';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Image as ImageIcon, Send, Users, X, Loader2, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { compressImage } from '../lib/imageUtils';
+import { useStorageUpload } from '../hooks/useStorageUpload';
 import Post from './Post';
 
 const POSTS_PER_PAGE = 10;
@@ -155,26 +156,15 @@ export default function Feed({ session }) {
     };
   }, [session.user.id]);
 
+  const { upload: uploadPostImage } = useStorageUpload({
+    bucket: 'post_images',
+    pathPrefix: session.user.id
+  });
+
   const handleImageUpload = async (file) => {
     if (!file) return null;
-
     try {
-      const compressedFile = await compressImage(file);
-      const fileExt = compressedFile.name.split('.').pop();
-      const fileName = `${session.user.id}-${Math.random()}.${fileExt}`;
-      const filePath = `${session.user.id}/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('post_images')
-        .upload(filePath, compressedFile);
-
-      if (uploadError) throw uploadError;
-
-      const { data: publicUrlData } = supabase.storage
-        .from('post_images')
-        .getPublicUrl(filePath);
-
-      return publicUrlData.publicUrl;
+      return await uploadPostImage(file);
     } catch (error) {
       console.error('Erro no upload:', error);
       return null;
@@ -219,7 +209,7 @@ export default function Feed({ session }) {
       fetchPosts(0); // Volta pro topo
     } catch (error) {
       console.error('Erro ao postar:', error);
-      alert('Ocorreu um erro ao criar a publicação. ' + error.message);
+      toast('Ocorreu um erro ao criar a publicação. ' + error.message);
     } finally {
       setPosting(false);
       setUploadingImage(false);
@@ -231,7 +221,7 @@ export default function Feed({ session }) {
 
     const newFiles = Array.from(e.target.files);
     if (selectedImages.length + newFiles.length > 5) {
-      alert('Você pode selecionar no máximo 5 imagens por postagem.');
+      toast('Você pode selecionar no máximo 5 imagens por postagem.');
       return;
     }
 
@@ -382,7 +372,7 @@ export default function Feed({ session }) {
       if (error) throw error;
     } catch (err) {
       console.error("Erro ao editar post", err);
-      alert("Erro ao editar post.");
+      toast("Erro ao editar post.");
     }
   };
 
@@ -490,7 +480,7 @@ export default function Feed({ session }) {
       ]);
 
       if (error) throw error;
-      alert("Publicação compartilhada!");
+      toast("Publicação compartilhada!");
       fetchPosts(0);
     } catch(err) {
       console.error("Erro ao compartilhar", err);
