@@ -35,6 +35,11 @@ create trigger on_auth_user_created
 -- full_name, role, location, bio, avatar_url, cover_url
 create or replace function public.check_profile_update()
 returns trigger as $$
+declare
+  _new_json jsonb;
+  _old_json jsonb;
+  _key text;
+  _allowed_keys text[] := array['full_name', 'role', 'location', 'bio', 'avatar_url', 'cover_url'];
 begin
   -- Verifica se alguma coluna não permitida foi alterada comparando com a versão antiga (OLD)
 
@@ -50,23 +55,17 @@ begin
 
   -- A instrução exige que APENAS full_name, role, location, bio, avatar_url e cover_url possam ser alteradas.
   -- Se as outras colunas mudaram, lançamos exceção.
-  -- Como o schema básico inicial não tem cover_url, mas pode ser adicionado em outras migrations,
-  -- vamos focar no que sabemos que EXISTE, e as demais são consideradas restritas.
-
   -- Vamos converter NEW e OLD para JSONB e comparar chaves que não estão na "whitelist"
-  declare
-    _new_json jsonb := to_jsonb(new);
-    _old_json jsonb := to_jsonb(old);
-    _key text;
-    _allowed_keys text[] := array['full_name', 'role', 'location', 'bio', 'avatar_url', 'cover_url'];
-  begin
-    for _key in select jsonb_object_keys(_new_json) loop
-      -- Se a chave não estiver nas permitidas e o valor mudou
-      if not (_key = any(_allowed_keys)) and _new_json->>_key is distinct from _old_json->>_key then
-        raise exception 'Não é permitido alterar a coluna: %', _key;
-      end if;
-    end loop;
-  end;
+
+  _new_json := to_jsonb(new);
+  _old_json := to_jsonb(old);
+
+  for _key in select jsonb_object_keys(_new_json) loop
+    -- Se a chave não estiver nas permitidas e o valor mudou
+    if not (_key = any(_allowed_keys)) and _new_json->>_key is distinct from _old_json->>_key then
+      raise exception 'Não é permitido alterar a coluna: %', _key;
+    end if;
+  end loop;
 
   return new;
 end;
