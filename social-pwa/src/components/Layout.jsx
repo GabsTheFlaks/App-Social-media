@@ -4,6 +4,7 @@ import { Home, Users, MessageCircle, Bell, User, LogOut } from 'lucide-react';
 import clsx from 'clsx';
 import { supabase } from '../lib/supabase';
 import OfflineBanner from './OfflineBanner';
+import InstallPrompt from './InstallPrompt';
 
 export default function Layout({ session }) {
   const [unreadCount, setUnreadCount] = useState(0);
@@ -173,6 +174,7 @@ export default function Layout({ session }) {
           </NavLink>
         ))}
       </nav>
+      <InstallPrompt />
     </div>
   );
 }
